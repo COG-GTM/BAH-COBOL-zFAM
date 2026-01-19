@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Routes, Route, Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
@@ -17,7 +18,9 @@ import {
   GitBranch,
   BarChart3,
   Users,
-  TrendingUp
+  TrendingUp,
+  BookOpen,
+  ArrowLeft
 } from 'lucide-react'
 import './App.css'
 
@@ -191,9 +194,17 @@ const HeroSection = () => (
           COBOL Modernization<br />
           <span className="gradient-text">with Devin AI</span>
         </h1>
-        <p className="text-xl text-[#71717a] max-w-3xl mx-auto">
+        <p className="text-xl text-[#71717a] max-w-3xl mx-auto mb-6">
           Accelerating Legacy System Transformation for Federal Agencies
         </p>
+        <Link 
+          to="/whitepaper"
+          className="inline-flex items-center gap-2 text-[#3969CA] hover:text-[#21C19A] transition-colors"
+        >
+          <BookOpen className="w-5 h-5" />
+          Read the Executive Whitepaper
+          <ArrowRight className="w-4 h-4" />
+        </Link>
       </motion.div>
 
       {/* Key Metrics */}
@@ -607,14 +618,14 @@ const TechnicalCapabilitiesSection = () => (
               <Layers className="w-8 h-8 text-[#21C19A] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Architecture Mapping</h4>
               <p className="text-[#71717a] text-sm">
-                Visualize relationships between system components including multi-tier VSAM storage architectures, program dispatch models, and security integration patterns.
+                Visualize relationships between system components including multi-tier <span className="text-[#fafafa]">VSAM</span> <span className="text-[#71717a] text-xs">(file storage)</span> architectures, program dispatch models, and security integration patterns.
               </p>
             </div>
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
               <Database className="w-8 h-8 text-[#0294DE] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Data Flow Analysis</h4>
               <p className="text-[#71717a] text-sm">
-                Trace data movement across copybooks, working storage, and file definitions. Map DCLGEN structures to database schemas and identify data transformation points.
+                Trace data movement across copybooks, working storage, and file definitions. Map <span className="text-[#fafafa]">DCLGEN</span> <span className="text-[#71717a] text-xs">(DB2 declarations)</span> structures to database schemas and identify data transformation points.
               </p>
             </div>
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
@@ -633,7 +644,7 @@ const TechnicalCapabilitiesSection = () => (
               <Server className="w-8 h-8 text-[#3969CA] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">CICS Transaction Handling</h4>
               <p className="text-[#71717a] text-sm mb-3">
-                Deep analysis of CICS patterns: EXEC CICS commands, XCTL/LINK transfers, COMMAREA parameter passing, HANDLE CONDITION/ABEND error management, and BMS map processing.
+                Deep analysis of <span className="text-[#fafafa]">CICS</span> <span className="text-[#71717a] text-xs">(transaction processor)</span> patterns: EXEC CICS commands, <span className="text-[#fafafa]">XCTL/LINK</span> <span className="text-[#71717a] text-xs">(program transfers)</span>, <span className="text-[#fafafa]">COMMAREA</span> <span className="text-[#71717a] text-xs">(data passing)</span> parameter passing, HANDLE CONDITION/ABEND error management, and <span className="text-[#fafafa]">BMS</span> <span className="text-[#71717a] text-xs">(screen maps)</span> processing.
               </p>
               <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">TXNRTR001.cbl, TXNPROC002.cbl</code>
             </div>
@@ -641,7 +652,7 @@ const TechnicalCapabilitiesSection = () => (
               <Database className="w-8 h-8 text-[#21C19A] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">VSAM & DB2 Operations</h4>
               <p className="text-[#71717a] text-sm mb-3">
-                VSAM browse operations (STARTBR, READNEXT, READPREV), KSDS/ESDS/RRDS file handling, embedded SQL parsing, DCLGEN structure mapping, and cursor management patterns.
+                <span className="text-[#fafafa]">VSAM</span> <span className="text-[#71717a] text-xs">(file storage)</span> browse operations (STARTBR, READNEXT, READPREV), <span className="text-[#fafafa]">KSDS/ESDS/RRDS</span> <span className="text-[#71717a] text-xs">(file types)</span> handling, embedded SQL parsing, <span className="text-[#fafafa]">DCLGEN</span> <span className="text-[#71717a] text-xs">(DB2 declarations)</span> structure mapping, and cursor management patterns.
               </p>
               <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">FILEHNDL003.cbl, DBACCESS004.cbl</code>
             </div>
@@ -649,7 +660,7 @@ const TechnicalCapabilitiesSection = () => (
               <Code className="w-8 h-8 text-[#0294DE] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Copybook & Linkage Analysis</h4>
               <p className="text-[#71717a] text-sm mb-3">
-                Parse COPY statements, resolve nested copybook hierarchies, analyze LINKAGE SECTION parameters, and map data structures across program boundaries.
+                Parse <span className="text-[#fafafa]">COPY</span> <span className="text-[#71717a] text-xs">(include files)</span> statements, resolve nested copybook hierarchies, analyze <span className="text-[#fafafa]">LINKAGE SECTION</span> <span className="text-[#71717a] text-xs">(parameter definitions)</span>, and map data structures across program boundaries.
               </p>
               <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">CPYBOOK001.cpy, LINKAGE002.cpy</code>
             </div>
@@ -657,7 +668,7 @@ const TechnicalCapabilitiesSection = () => (
               <Lock className="w-8 h-8 text-[#3969CA] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Security & Authorization</h4>
               <p className="text-[#71717a] text-sm mb-3">
-                RACF integration patterns, field-level authorization, SAF calls, and security exit analysis for federal compliance requirements.
+                <span className="text-[#fafafa]">RACF</span> <span className="text-[#71717a] text-xs">(access control)</span> integration patterns, field-level authorization, <span className="text-[#fafafa]">SAF</span> <span className="text-[#71717a] text-xs">(security interface)</span> calls, and security exit analysis for federal compliance requirements.
               </p>
               <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">SECAUTH001.cbl, RACFINTF002.cbl</code>
             </div>
@@ -670,21 +681,21 @@ const TechnicalCapabilitiesSection = () => (
               <GitBranch className="w-8 h-8 text-[#3969CA] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">API Generation & Modernization</h4>
               <p className="text-[#71717a] text-sm">
-                Generate RESTful APIs from COBOL programs, map COMMAREA structures to JSON schemas, create OpenAPI specifications, and implement modern authentication patterns.
+                Generate RESTful APIs from COBOL programs, map <span className="text-[#fafafa]">COMMAREA</span> <span className="text-[#71717a] text-xs">(data passing)</span> structures to JSON schemas, create OpenAPI specifications, and implement modern authentication patterns.
               </p>
             </div>
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
               <Zap className="w-8 h-8 text-[#21C19A] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Code Generation</h4>
               <p className="text-[#71717a] text-sm">
-                Generate equivalent Python/Java/TypeScript code from COBOL business logic, create database migration scripts from DCLGEN, and produce microservices from monolithic programs.
+                Generate equivalent Python/Java/TypeScript code from COBOL business logic, create database migration scripts from <span className="text-[#fafafa]">DCLGEN</span> <span className="text-[#71717a] text-xs">(DB2 declarations)</span>, and produce microservices from monolithic programs.
               </p>
             </div>
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
               <Layers className="w-8 h-8 text-[#0294DE] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Batch to Event-Driven</h4>
               <p className="text-[#71717a] text-sm">
-                Transform JCL batch workflows into event-driven architectures, convert sequential file processing to streaming patterns, and modernize scheduling dependencies.
+                Transform <span className="text-[#fafafa]">JCL</span> <span className="text-[#71717a] text-xs">(job control)</span> batch workflows into event-driven architectures, convert sequential file processing to streaming patterns, and modernize scheduling dependencies.
               </p>
             </div>
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
@@ -1150,6 +1161,190 @@ const CTASection = () => (
   </section>
 )
 
+// Executive Whitepaper Page
+const WhitepaperPage = () => {
+  const navigate = useNavigate()
+  
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] grid-pattern">
+      <div className="hero-glow absolute inset-0 pointer-events-none" />
+      
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-[#0a0a0f]/95 backdrop-blur-sm border-b border-[#27272a]">
+        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+          <button 
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 text-[#71717a] hover:text-[#fafafa] transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Demo
+          </button>
+          <div className="flex items-center gap-3">
+            <CognitionSprocket />
+            <span className="text-[#71717a] text-sm">Executive Whitepaper</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="relative z-10 max-w-4xl mx-auto px-6 py-16">
+        <motion.article
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="prose prose-invert max-w-none"
+        >
+          {/* Title */}
+          <div className="text-center mb-16">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <BookOpen className="w-6 h-6 text-[#3969CA]" />
+              <span className="text-[#3969CA] text-sm uppercase tracking-widest">Executive Whitepaper</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-[#fafafa] mb-6">
+              COBOL Modernization with AI:<br />
+              <span className="gradient-text">A New Paradigm</span>
+            </h1>
+            <p className="text-[#71717a] text-lg">
+              How Cognition AI is solving the legacy modernization challenge that has eluded the industry for decades
+            </p>
+          </div>
+
+          {/* Problem Statement */}
+          <section className="mb-16">
+            <h2 className="text-2xl font-bold text-[#fafafa] mb-6 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#3969CA]/20 flex items-center justify-center">
+                <span className="text-[#3969CA] font-bold">1</span>
+              </div>
+              The COBOL Challenge
+            </h2>
+            
+            <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-8 mb-6">
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                COBOL remains the backbone of critical infrastructure across federal agencies, financial institutions, and healthcare organizations. An estimated 220 billion lines of COBOL code continue to process trillions of dollars in daily transactions, manage social security benefits, and power core banking systems. Yet this foundational technology faces an existential crisis that threatens operational continuity and national security.
+              </p>
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                The challenge is multifaceted. First, there is a severe talent shortage: the average COBOL developer is approaching retirement age, and universities stopped teaching the language decades ago. Organizations report that finding qualified mainframe developers has become nearly impossible, with some positions remaining unfilled for years. Second, the accumulated technical debt is staggering. These systems have evolved over 40-60 years through countless modifications, often with minimal documentation. Business rules are embedded deep within procedural code, making it extremely difficult to understand what the system actually does versus what it was originally designed to do.
+              </p>
+              <p className="text-[#a1a1aa] leading-relaxed">
+                Perhaps most critically, the lack of codebase understanding creates a paralysis that prevents meaningful modernization. When no one fully comprehends how a system works, making structural changes becomes too risky. Organizations find themselves trapped: unable to modernize because they don't understand the code, and unable to understand the code because the people who wrote it are no longer available. This creates a vicious cycle where systems become increasingly brittle while the knowledge gap widens with each passing year.
+              </p>
+            </div>
+          </section>
+
+          {/* Our Approach */}
+          <section className="mb-16">
+            <h2 className="text-2xl font-bold text-[#fafafa] mb-6 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#21C19A]/20 flex items-center justify-center">
+                <span className="text-[#21C19A] font-bold">2</span>
+              </div>
+              The Cognition Approach
+            </h2>
+            
+            <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-8 mb-6">
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                Cognition AI has developed a fundamentally different approach to COBOL modernization, one that addresses the root cause of the problem rather than just its symptoms. Our methodology begins with comprehensive understanding before any code transformation occurs. This is where traditional approaches have failed: they attempt to translate code without first understanding what it does, leading to modernization projects that either fail outright or produce systems that don't accurately replicate the original business logic.
+              </p>
+              
+              <h3 className="text-xl font-semibold text-[#fafafa] mt-8 mb-4">DeepWiki: Architecture Visualization & Understanding</h3>
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                Our foundation is DeepWiki, an AI-powered system that creates comprehensive, navigable documentation from existing COBOL codebases. DeepWiki doesn't just parse syntax; it understands semantics. It traces data flows across copybooks and program boundaries, identifies business rules embedded in conditional logic, maps relationships between CICS transactions and VSAM files, and documents the implicit knowledge that exists only in the code itself. The result is a living knowledge base that makes decades of accumulated complexity accessible and understandable.
+              </p>
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                DeepWiki analyzes program structures including WORKING-STORAGE definitions, LINKAGE SECTION parameters, and FILE-CONTROL entries. It understands CICS patterns like EXEC CICS commands, COMMAREA data passing, and BMS screen maps. It parses embedded SQL, maps DCLGEN structures to database schemas, and traces the flow of data through complex batch processing chains defined in JCL. This comprehensive analysis creates the foundation for informed modernization decisions.
+              </p>
+
+              <h3 className="text-xl font-semibold text-[#fafafa] mt-8 mb-4">Ask Devin: Strategic Planning & Architecture</h3>
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                With understanding established, Ask Devin enables strategic planning for modernization. Teams can query the codebase in natural language: "What business rules govern account validation?" or "Which programs would be affected if we change the customer record format?" Ask Devin provides accurate, contextual answers that would previously have required weeks of manual code review.
+              </p>
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                More importantly, Ask Devin helps architects plan the modernization journey. It can identify logical service boundaries within monolithic programs, suggest microservices decomposition strategies, and highlight areas of high complexity that require special attention. It documents dependencies, identifies shared copybooks, and maps the integration points that must be preserved during migration. This planning capability transforms modernization from a risky leap of faith into a methodical, well-understood process.
+              </p>
+
+              <h3 className="text-xl font-semibold text-[#fafafa] mt-8 mb-4">Devin Agent: Autonomous Code Generation & Testing</h3>
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                The Devin agent represents the culmination of our approach: an AI software engineer capable of autonomous code generation, testing, and validation. Unlike simple code translation tools, Devin understands the intent behind COBOL code and generates idiomatic modern equivalents. It doesn't produce line-by-line translations that preserve COBOL's procedural structure in Python or Java; instead, it creates clean, maintainable code that follows modern best practices while preserving exact functional equivalence.
+              </p>
+              <p className="text-[#a1a1aa] leading-relaxed">
+                Devin handles the full spectrum of modernization tasks: generating RESTful APIs from CICS transactions, creating database migration scripts from DCLGEN definitions, transforming batch JCL workflows into event-driven architectures, and producing comprehensive test suites that validate functional equivalence. It can work autonomously on well-defined tasks or collaborate with human developers on complex transformations, always maintaining the context and understanding established through DeepWiki analysis.
+              </p>
+            </div>
+          </section>
+
+          {/* Why We've Won */}
+          <section className="mb-16">
+            <h2 className="text-2xl font-bold text-[#fafafa] mb-6 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#0294DE]/20 flex items-center justify-center">
+                <span className="text-[#0294DE] font-bold">3</span>
+              </div>
+              Why This Approach Succeeds
+            </h2>
+            
+            <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-8 mb-6">
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                The industry has attempted COBOL modernization for decades with limited success. Large-scale rewrite projects have failed spectacularly, automated translation tools have produced unmaintainable code, and gradual refactoring efforts have stalled due to complexity and risk. Cognition's approach succeeds where others have failed because it addresses the fundamental problem: understanding.
+              </p>
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                Previous approaches treated modernization as primarily a translation problem. They assumed that if you could convert COBOL syntax to Java or Python syntax, the job was done. But syntax translation without semantic understanding produces code that is technically correct but practically useless: it preserves COBOL's 1960s-era programming patterns in a modern language, creating systems that are harder to maintain than the originals.
+              </p>
+              <p className="text-[#a1a1aa] leading-relaxed mb-4">
+                Our approach inverts this paradigm. We begin with deep understanding, then use that understanding to guide intelligent transformation. The AI doesn't just translate; it comprehends, plans, and generates. It understands that a particular PERFORM loop implements a business rule for interest calculation, and it generates a clean, well-documented function that implements that same rule in modern idioms. It recognizes that a complex CICS transaction can be decomposed into discrete microservices, and it generates the APIs, data contracts, and integration code to make that decomposition work.
+              </p>
+              <p className="text-[#a1a1aa] leading-relaxed">
+                This is why Cognition has won major modernization initiatives at global financial institutions, Fortune 100 healthcare companies, and the world's largest system integrators. We've demonstrated 80% effort savings compared to traditional approaches, with 90% of functionality successfully migrated and 100% documentation coverage. Organizations that had been paralyzed by the complexity of their legacy systems are now making meaningful progress toward modernization, enabled by AI that finally makes their code understandable.
+              </p>
+            </div>
+          </section>
+
+          {/* Call to Action */}
+          <section className="text-center">
+            <div className="bg-gradient-to-r from-[#3969CA]/10 via-[#21C19A]/10 to-[#0294DE]/10 border border-[#27272a] rounded-xl p-12">
+              <h2 className="text-2xl font-bold text-[#fafafa] mb-4">
+                Ready to Modernize Your Legacy Systems?
+              </h2>
+              <p className="text-[#a1a1aa] mb-8 max-w-2xl mx-auto">
+                Cognition AI is helping federal agencies and enterprises transform their COBOL systems with unprecedented speed and accuracy. Let us show you what's possible.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <a
+                  href="https://cognition.ai"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-[#fafafa] text-[#0a0a0f] px-8 py-3 rounded-full font-semibold hover:bg-[#e4e4e7] transition-colors"
+                >
+                  Contact Cognition AI
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+                <button
+                  onClick={() => navigate('/')}
+                  className="inline-flex items-center gap-2 border border-[#27272a] text-[#fafafa] px-8 py-3 rounded-full font-semibold hover:bg-[#18181b] transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Demo
+                </button>
+              </div>
+            </div>
+          </section>
+        </motion.article>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 bg-[#18181b] border-t border-[#27272a] mt-16">
+        <div className="max-w-4xl mx-auto px-6 py-8 text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <CognitionSprocket />
+            <span className="text-[#71717a] text-sm">
+              Cognition AI Platform - The world's first AI software engineer + agentic IDE
+            </span>
+          </div>
+          <p className="text-[#71717a] text-sm">
+            Built by Cognition AI - Devin, the world's first AI software engineer, and Windsurf
+          </p>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
 // Footer Component
 const Footer = () => (
   <footer className="bg-[#18181b] border-t border-[#27272a]">
@@ -1175,6 +1370,27 @@ const Footer = () => (
   </footer>
 )
 
+// Main Demo Page Component
+const MainPage = () => (
+  <div className="min-h-screen bg-[#0a0a0f] grid-pattern">
+    <GovBanner />
+    <Header />
+    <main>
+      <HeroSection />
+      <ValuePropositionSection />
+      <MigrationApproachSection />
+      <CaseStudiesSection />
+      <TechnicalCapabilitiesSection />
+      <EngagementApproachSection />
+      <SuccessMetricsSection />
+      <ComplianceSection />
+      <CognitionPlatformSection />
+      <CTASection />
+    </main>
+    <Footer />
+  </div>
+)
+
 // Main App Component
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -1197,23 +1413,10 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] grid-pattern">
-      <GovBanner />
-      <Header />
-      <main>
-        <HeroSection />
-        <ValuePropositionSection />
-        <MigrationApproachSection />
-        <CaseStudiesSection />
-        <TechnicalCapabilitiesSection />
-        <EngagementApproachSection />
-        <SuccessMetricsSection />
-        <ComplianceSection />
-        <CognitionPlatformSection />
-        <CTASection />
-      </main>
-      <Footer />
-    </div>
+    <Routes>
+      <Route path="/" element={<MainPage />} />
+      <Route path="/whitepaper" element={<WhitepaperPage />} />
+    </Routes>
   )
 }
 
