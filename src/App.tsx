@@ -199,11 +199,19 @@ const HeroSection = () => (
         </p>
         <Link 
           to="/whitepaper"
-          className="inline-flex items-center gap-2 text-[#3969CA] hover:text-[#21C19A] transition-colors"
+          className="inline-block mt-4"
         >
-          <BookOpen className="w-5 h-5" />
-          Read the Executive Whitepaper
-          <ArrowRight className="w-4 h-4" />
+          <div className="bg-gradient-to-r from-[#3969CA]/20 to-[#21C19A]/20 border-2 border-[#3969CA] hover:border-[#21C19A] rounded-2xl p-8 md:p-10 max-w-2xl mx-auto transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(57,105,202,0.3)] cursor-pointer">
+            <div className="flex items-center justify-center gap-4">
+              <BookOpen className="w-10 h-10 md:w-12 md:h-12 text-[#3969CA]" />
+              <div className="text-left">
+                <p className="text-[#71717a] text-sm uppercase tracking-wider mb-1">Executive Whitepaper</p>
+                <h3 className="text-2xl md:text-3xl font-bold text-[#fafafa]">COBOL Modernization with AI</h3>
+                <p className="text-[#71717a] mt-1">Learn how Cognition is solving the legacy modernization challenge</p>
+              </div>
+              <ArrowRight className="w-8 h-8 text-[#21C19A]" />
+            </div>
+          </div>
         </Link>
       </motion.div>
 
