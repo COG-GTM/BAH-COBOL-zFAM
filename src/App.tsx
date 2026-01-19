@@ -460,27 +460,27 @@ const CaseStudiesSection = () => (
       >
         <h2 className="text-3xl font-bold text-[#fafafa] mb-4">Proven Results</h2>
         <p className="text-[#71717a] max-w-2xl mx-auto">
-          Devin has successfully modernized COBOL systems for leading financial and healthcare organizations
+          Devin has successfully modernized COBOL systems across financial services, healthcare, and government sectors
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.1 }}
-          className="bg-[#18181b] border border-[#27272a] rounded-xl p-8 card-hover"
+          className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 card-hover"
         >
           <div className="flex items-center gap-2 mb-4">
             <Database className="w-6 h-6 text-[#3969CA]" />
             <span className="text-[#71717a] text-sm">Financial Services</span>
           </div>
-          <h3 className="text-xl font-semibold text-[#fafafa] mb-3">Tier 1 Latin American Bank</h3>
+          <h3 className="text-lg font-semibold text-[#fafafa] mb-3">Global Tier 1 Bank</h3>
           <ul className="space-y-2 text-[#71717a] text-sm mb-4">
             <li>500+ Devin sessions completed</li>
-            <li>CNPJ field migrations automated</li>
-            <li>GNUCobol validation implemented</li>
+            <li>Field-level data migrations</li>
+            <li>Automated validation testing</li>
             <li>Iterative playbook evolution</li>
           </ul>
           <div className="flex items-center gap-2 text-[#21C19A] text-sm">
@@ -494,16 +494,16 @@ const CaseStudiesSection = () => (
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.2 }}
-          className="bg-[#18181b] border border-[#27272a] rounded-xl p-8 card-hover"
+          className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 card-hover"
         >
           <div className="flex items-center gap-2 mb-4">
             <Database className="w-6 h-6 text-[#21C19A]" />
             <span className="text-[#71717a] text-sm">Financial Services</span>
           </div>
-          <h3 className="text-xl font-semibold text-[#fafafa] mb-3">Major Latin American Bank</h3>
+          <h3 className="text-lg font-semibold text-[#fafafa] mb-3">Fortune 500 Insurance</h3>
           <ul className="space-y-2 text-[#71717a] text-sm mb-4">
-            <li>Batch/CICS/CNPJ migrations</li>
-            <li>ZOE file transfer integration</li>
+            <li>Batch/CICS migrations</li>
+            <li>File transfer modernization</li>
             <li>Automated compilation feedback</li>
             <li>Cross-system validation</li>
           </ul>
@@ -518,22 +518,46 @@ const CaseStudiesSection = () => (
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.3 }}
-          className="bg-[#18181b] border border-[#27272a] rounded-xl p-8 card-hover"
+          className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 card-hover"
         >
           <div className="flex items-center gap-2 mb-4">
             <Database className="w-6 h-6 text-[#0294DE]" />
             <span className="text-[#71717a] text-sm">Healthcare</span>
           </div>
-          <h3 className="text-xl font-semibold text-[#fafafa] mb-3">Fortune 100 Healthcare Company</h3>
+          <h3 className="text-lg font-semibold text-[#fafafa] mb-3">Fortune 100 Healthcare</h3>
           <ul className="space-y-2 text-[#71717a] text-sm mb-4">
             <li>Repository integration complete</li>
-            <li>70-80% completion rate achieved</li>
+            <li>70-80% completion rate</li>
             <li>Repetitive changes automated</li>
             <li>Cross-component consistency</li>
           </ul>
           <div className="flex items-center gap-2 text-[#21C19A] text-sm">
             <CheckCircle className="w-4 h-4" />
             Scaling deployment
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.4 }}
+          className="bg-[#18181b] border border-[#27272a] rounded-xl p-6 card-hover"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Shield className="w-6 h-6 text-[#3969CA]" />
+            <span className="text-[#71717a] text-sm">Federal Agency</span>
+          </div>
+          <h3 className="text-lg font-semibold text-[#fafafa] mb-3">Defense Contractor</h3>
+          <ul className="space-y-2 text-[#71717a] text-sm mb-4">
+            <li>Legacy system documentation</li>
+            <li>STIG compliance analysis</li>
+            <li>Security pattern extraction</li>
+            <li>Modernization roadmap</li>
+          </ul>
+          <div className="flex items-center gap-2 text-[#21C19A] text-sm">
+            <CheckCircle className="w-4 h-4" />
+            Assessment complete
           </div>
         </motion.div>
       </div>
@@ -553,7 +577,7 @@ const TechnicalCapabilitiesSection = () => (
       >
         <h2 className="text-3xl font-bold text-[#fafafa] mb-4">Technical Capabilities</h2>
         <p className="text-[#71717a] max-w-2xl mx-auto">
-          Deep understanding of mainframe patterns demonstrated through zFAM repository analysis
+          Deep understanding of mainframe patterns and enterprise COBOL architectures
         </p>
       </motion.div>
 
@@ -576,14 +600,28 @@ const TechnicalCapabilitiesSection = () => (
               <FileText className="w-8 h-8 text-[#3969CA] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Automated Documentation</h4>
               <p className="text-[#71717a] text-sm">
-                Transform dense COBOL procedures into clear, navigable documentation. Analyze programs like ZFAM002.cbl (4,000+ lines) and generate comprehensive API documentation.
+                Transform dense COBOL procedures into clear, navigable documentation. Analyze complex programs (4,000+ lines) and generate comprehensive API documentation with business rule extraction.
               </p>
             </div>
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
               <Layers className="w-8 h-8 text-[#21C19A] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Architecture Mapping</h4>
               <p className="text-[#71717a] text-sm">
-                Visualize relationships between system components including three-tier VSAM storage (FK-FCT, FF-FCT, CI-FCT), program dispatch models, and RACF security integration.
+                Visualize relationships between system components including multi-tier VSAM storage architectures, program dispatch models, and security integration patterns.
+              </p>
+            </div>
+            <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
+              <Database className="w-8 h-8 text-[#0294DE] mb-4" />
+              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Data Flow Analysis</h4>
+              <p className="text-[#71717a] text-sm">
+                Trace data movement across copybooks, working storage, and file definitions. Map DCLGEN structures to database schemas and identify data transformation points.
+              </p>
+            </div>
+            <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
+              <Code className="w-8 h-8 text-[#3969CA] mb-4" />
+              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Business Rule Extraction</h4>
+              <p className="text-[#71717a] text-sm">
+                Identify and document embedded business logic, validation rules, and calculation algorithms from procedural code into structured specifications.
               </p>
             </div>
           </div>
@@ -595,33 +633,33 @@ const TechnicalCapabilitiesSection = () => (
               <Server className="w-8 h-8 text-[#3969CA] mb-4" />
               <h4 className="text-lg font-semibold text-[#fafafa] mb-2">CICS Transaction Handling</h4>
               <p className="text-[#71717a] text-sm mb-3">
-                Patterns from ZFAM002.cbl: Request routing, XCTL transfers, COMMAREA parameter passing, NOHANDLE error management.
+                Deep analysis of CICS patterns: EXEC CICS commands, XCTL/LINK transfers, COMMAREA parameter passing, HANDLE CONDITION/ABEND error management, and BMS map processing.
               </p>
-              <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">ZFAM002.cbl, ZFAM004.cbl</code>
+              <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">TXNRTR001.cbl, TXNPROC002.cbl</code>
             </div>
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
               <Database className="w-8 h-8 text-[#21C19A] mb-4" />
-              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">VSAM File Operations</h4>
+              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">VSAM & DB2 Operations</h4>
               <p className="text-[#71717a] text-sm mb-3">
-                Efficient browse operations using STARTBR, READNEXT, READPREV. Two-tier storage model with flexible key/value semantics.
+                VSAM browse operations (STARTBR, READNEXT, READPREV), KSDS/ESDS/RRDS file handling, embedded SQL parsing, DCLGEN structure mapping, and cursor management patterns.
               </p>
-              <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">ZFAM004.cbl, ZFAM008.cbl</code>
+              <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">FILEHNDL003.cbl, DBACCESS004.cbl</code>
             </div>
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
               <Code className="w-8 h-8 text-[#0294DE] mb-4" />
-              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Assembler-COBOL Integration</h4>
+              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Copybook & Linkage Analysis</h4>
               <p className="text-[#71717a] text-sm mb-3">
-                Performance-critical operations in Assembler while maintaining business logic in COBOL for maintainability.
+                Parse COPY statements, resolve nested copybook hierarchies, analyze LINKAGE SECTION parameters, and map data structures across program boundaries.
               </p>
-              <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">ZFAM022.asm, ZFAM006.asm</code>
+              <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">CPYBOOK001.cpy, LINKAGE002.cpy</code>
             </div>
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
               <Lock className="w-8 h-8 text-[#3969CA] mb-4" />
-              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Security Model (RACF)</h4>
+              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Security & Authorization</h4>
               <p className="text-[#71717a] text-sm mb-3">
-                Field-level authorization through document templates (FAxxSD) and RACF integration for federal compliance.
+                RACF integration patterns, field-level authorization, SAF calls, and security exit analysis for federal compliance requirements.
               </p>
-              <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">FA##SD.txt, CSDZFAM.rdo</code>
+              <code className="text-xs text-[#71717a] bg-[#27272a] px-2 py-1 rounded">SECAUTH001.cbl, RACFINTF002.cbl</code>
             </div>
           </div>
         </TabsContent>
@@ -630,16 +668,30 @@ const TechnicalCapabilitiesSection = () => (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
               <GitBranch className="w-8 h-8 text-[#3969CA] mb-4" />
-              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">RESTful API Design</h4>
+              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">API Generation & Modernization</h4>
               <p className="text-[#71717a] text-sm">
-                HTTP/HTTPS interfaces with JSON/XML response formatting. Custom headers (zFAM-LastKey, zFAM-Rows, zFAM-RangeEnd) for pagination and range queries.
+                Generate RESTful APIs from COBOL programs, map COMMAREA structures to JSON schemas, create OpenAPI specifications, and implement modern authentication patterns.
               </p>
             </div>
             <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
               <Zap className="w-8 h-8 text-[#21C19A] mb-4" />
-              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Modern Capabilities</h4>
+              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Code Generation</h4>
               <p className="text-[#71717a] text-sm">
-                NoSQL key/value store, ACID compliance, chunked transfer encoding for large payloads, Active/Active and Active/Standby replication modes.
+                Generate equivalent Python/Java/TypeScript code from COBOL business logic, create database migration scripts from DCLGEN, and produce microservices from monolithic programs.
+              </p>
+            </div>
+            <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
+              <Layers className="w-8 h-8 text-[#0294DE] mb-4" />
+              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Batch to Event-Driven</h4>
+              <p className="text-[#71717a] text-sm">
+                Transform JCL batch workflows into event-driven architectures, convert sequential file processing to streaming patterns, and modernize scheduling dependencies.
+              </p>
+            </div>
+            <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-6">
+              <FileText className="w-8 h-8 text-[#3969CA] mb-4" />
+              <h4 className="text-lg font-semibold text-[#fafafa] mb-2">Test Generation</h4>
+              <p className="text-[#71717a] text-sm">
+                Generate unit tests from existing COBOL test cases, create integration test suites, and produce validation scripts to ensure functional equivalence post-migration.
               </p>
             </div>
           </div>
