@@ -91,6 +91,7 @@ else
 fi
 
 # Test 1.7: DFHVALUE replaced with stub variables
+make -s build/preprocessed/ZFAM002.cbl 2>/dev/null
 if grep -q "DFHVALUE-" build/preprocessed/ZFAM002.cbl 2>/dev/null; then
     pass "DFHVALUE() calls replaced with stub variables"
 else
