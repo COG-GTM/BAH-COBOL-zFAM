@@ -1,0 +1,5 @@
+# Build artifacts
+build/preprocessed/
+build/copybooks/
+build/obj/
+build/tests/
