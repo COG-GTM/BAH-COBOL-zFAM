@@ -142,7 +142,7 @@ else
 fi
 
 # Verify object files were created
-OBJ_COUNT=$(ls build/obj/*.o 2>/dev/null | wc -l)
+OBJ_COUNT=$(ls build/obj/*.o 2>/dev/null | wc -l || true)
 if [ "$OBJ_COUNT" -eq 14 ]; then
     pass "All 14 object files generated"
 else
