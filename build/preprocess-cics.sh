@@ -49,8 +49,16 @@ BEGIN {
 
 # Detect start of EXEC CICS block
 /EXEC CICS/ {
-    in_exec_cics = 1
     print "      * [CICS] " substr($0, 8)
+    if ($0 ~ /END-EXEC/) {
+        if ($0 ~ /END-EXEC[[:space:]]*\./) {
+            print "           CONTINUE."
+        } else {
+            print "           CONTINUE"
+        }
+    } else {
+        in_exec_cics = 1
+    }
     next
 }
 
