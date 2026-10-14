@@ -210,28 +210,31 @@ def model(records, req):
         else:
             selected = (select[:4] == b"text") == (rec.obj == "text")
         if selected:
-            rows_count += 1
             key = rec.key
             row = (conv(b"%03d" % len(key)) if not req.delim
                    else (req.delim.encode() if count else b"")) + conv(key)
+            if not req.keys_only:
+                row += b"\0" * (7 if not req.delim else 1)
+            if len(row) > GETMAIN_LENGTH - len(body):
+                buffer_full = True
+                break
             if req.keys_only:
                 body += row
                 count += 1
-            else:
+            elif rec.segments:
                 media = rec.media
                 logical = rec.declared_segments * SEGMENT_SIZE
-                available = GETMAIN_LENGTH - len(body) - len(row) - (
-                    7 if not req.delim else 1)
-                if logical > available:
+                if logical > GETMAIN_LENGTH - len(body) - len(row):
                     buffer_full = True
                     break
                 data = rec.data
                 if not req.delim:
-                    row += conv(b"%07d" % len(data)) + data
+                    row = row[:-7] + conv(b"%07d" % len(data)) + data
                 else:
-                    row += conv(req.delim.encode()) + data
+                    row = row[:-1] + conv(req.delim.encode()) + data
                 body += row
                 count += 1
+            rows_count = count
         if rows_count == req.rows:
             break
 
@@ -340,17 +343,48 @@ def golden_cases():
 
 
 def buffer_full_cases():
-    """A record whose segments can not fit in the response buffer."""
+    """Response buffer full (206) cases, each with its own table."""
+    k1, k2 = b"k1", b"k2"
+    cases = []
+
+    # The segments of k2 can not fit in the response buffer.
     records = [
         Record("k1", ["first"]),
         Record("k2", ["second"], declared_segments=GETMAIN_LENGTH // SEGMENT_SIZE),
         Record("k3", ["third"]),
     ]
-    k1 = b"k1"
     expected = response(206, k1, [("zFAM-LastKey", k1), ("zFAM-Rows", b"0001")],
                         "text/plain", "SRVCONVERT", b"002k10000005first")
-    return records, [(Request("ge", "k", 10), expected),
-                     (Request("le", "k3", 10, keys_only=True), None)]
+    cases.append((records, Request("ge", "k", 10), expected))
+    cases.append((records, Request("le", "k3", 10, keys_only=True), None))
+
+    # k1 and k2 leave fewer bytes in the response buffer than the key and
+    # framing of k3, which must not be written past the end of the buffer.
+    short = 30
+    full = b"x" * SEGMENT_SIZE
+    records = [
+        Record("k1", [full] * 98 + [full[:-short]]),
+        Record("k2", [full]),
+        Record("k3", ["third"]),
+    ]
+    cases.append((records, Request("ge", "k", 10), None))
+    cases.append((records, Request("ge", "k", 10, delim="|"), None))
+    return cases
+
+
+def missing_data_cases():
+    """KEY store entries whose FILE store record is missing are skipped."""
+    records = [
+        Record("a", [], declared_segments=1),
+        Record("b", ["bee"]),
+        Record("c", ["sea"]),
+    ]
+    b = b"b"
+    expected = response(200, b, [("zFAM-LastKey", b), ("zFAM-Rows", b"0001")],
+                        "text/plain", "SRVCONVERT", b"001b0000003bee")
+    return records, [(Request("ge", "a", 1), expected),
+                     (Request("le", "c", 9999, delim=","), None),
+                     (Request("ge", "a", 2), None)]
 
 
 def main():
@@ -380,10 +414,13 @@ def main():
             check(store, req, model(store[0], req))
         for req, expected in golden_cases():
             check(store, req, expected)
-        bf_records, bf_cases = buffer_full_cases()
-        bf_store = build_store(bf_records)
-        for req, expected in bf_cases:
+        for records, req, expected in buffer_full_cases():
+            bf_store = build_store(records)
             check(bf_store, req, expected or model(bf_store[0], req))
+        md_records, md_cases = missing_data_cases()
+        md_store = build_store(md_records)
+        for req, expected in md_cases:
+            check(md_store, req, expected or model(md_store[0], req))
 
         for req, expected, actual in failures[:10]:
             print("FAIL %r\n--- expected\n%s--- actual\n%s" % (req, expected,
@@ -416,10 +453,12 @@ def baseline_report(ref, tmp, store, exe, verbose):
     os.mkdir(work)
     diffs, total = Counter(), Counter()
     examples = {}
-    bf_records, bf_cases = buffer_full_cases()
-    bf_store = build_store(bf_records)
     cases = [(store, req) for req in scenarios()]
-    cases += [(bf_store, req) for req, _ in bf_cases]
+    cases += [(build_store(records), req)
+              for records, req, _ in buffer_full_cases()]
+    md_records, md_cases = missing_data_cases()
+    md_store = build_store(md_records)
+    cases += [(md_store, req) for req, _ in md_cases]
     for store, req in cases:
         prog = old_program(req)
         total[prog] += 1

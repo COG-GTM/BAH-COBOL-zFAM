@@ -463,6 +463,10 @@
            PERFORM 3100-READ-KEY             THRU 3100-EXIT.
 
            IF  PROCESS-INCOMPLETE AND SELECT-MATCHED
+               PERFORM 3150-CHECK-ROW-SPACE  THRU 3150-EXIT
+           END-IF.
+
+           IF  PROCESS-INCOMPLETE AND SELECT-MATCHED
                IF  FORMAT-KEYS-ONLY
                    PERFORM 3300-APPEND-KEY-ROW    THRU 3300-EXIT
                ELSE
@@ -558,11 +562,48 @@
                    SET SELECT-MATCHED        TO TRUE
            END-EVALUATE.
 
-           IF  SELECT-MATCHED
-               ADD 1                         TO ROWS-COUNT
+       3120-EXIT.
+           EXIT.
+
+      *****************************************************************
+      * Make sure the key and framing of the next row fit in the      *
+      * response buffer before any of the row is built.  When they    *
+      * do not, set the BUFFER-FULL condition, which ends the browse  *
+      * and returns HTTP status code 206.                             *
+      *****************************************************************
+       3150-CHECK-ROW-SPACE.
+           MOVE ZEROES                       TO TRAILING-NULLS.
+           INSPECT FUNCTION REVERSE(FK-KEY)
+               TALLYING TRAILING-NULLS FOR LEADING LOW-VALUES.
+
+           SUBTRACT TRAILING-NULLS FROM LENGTH OF FK-KEY
+               GIVING KEY-LENGTH.
+
+           MOVE KEY-LENGTH                   TO ROW-LENGTH.
+
+           IF  GET-CA-NO-DELIM
+               ADD KEY-LENGTH-DIGITS         TO ROW-LENGTH
+               IF  FORMAT-RECORDS
+                   ADD RECORD-LENGTH-DIGITS  TO ROW-LENGTH
+               END-IF
+           ELSE
+               IF  MESSAGE-COUNT NOT EQUAL ZEROES
+                   ADD DELIMITER-LENGTH      TO ROW-LENGTH
+               END-IF
+               IF  FORMAT-RECORDS
+                   ADD DELIMITER-LENGTH      TO ROW-LENGTH
+               END-IF
            END-IF.
 
-       3120-EXIT.
+           SUBTRACT MESSAGE-LENGTH FROM GETMAIN-LENGTH
+               GIVING AVAILABLE-LENGTH.
+
+           IF  ROW-LENGTH GREATER THAN AVAILABLE-LENGTH
+               SET BUFFER-FULL               TO TRUE
+               SET PROCESS-COMPLETE          TO TRUE
+           END-IF.
+
+       3150-EXIT.
            EXIT.
 
       *****************************************************************
@@ -570,6 +611,7 @@
       *   - the 3 digit key length, or                                *
       *   - the delimiter, for every row except the first, and        *
       *   - the key.                                                  *
+      * KEY-LENGTH is set by 3150-CHECK-ROW-SPACE.                     *
       * On exit, CURRENT-ADDRESS is the end of the key and ROW-LENGTH *
       * is the number of bytes built.                                 *
       *****************************************************************
@@ -577,13 +619,6 @@
            MOVE ZEROES                       TO ROW-LENGTH.
            MOVE START-ADDRESS-X              TO CURRENT-ADDRESS-X.
            SET ADDRESS OF ZFAM-MESSAGE       TO CURRENT-ADDRESS.
-
-           MOVE ZEROES                       TO TRAILING-NULLS.
-           INSPECT FUNCTION REVERSE(FK-KEY)
-               TALLYING TRAILING-NULLS FOR LEADING LOW-VALUES.
-
-           SUBTRACT TRAILING-NULLS FROM LENGTH OF FK-KEY
-               GIVING KEY-LENGTH.
 
            IF  GET-CA-NO-DELIM
                MOVE KEY-LENGTH               TO ZFAM-MESSAGE(1:3)
@@ -738,11 +773,13 @@
 
       *****************************************************************
       * Commit the row built at START-ADDRESS to the response.        *
+      * Only committed rows count toward the ROWS limit.              *
       *****************************************************************
        3600-COMMIT-ROW.
            ADD  ROW-LENGTH                   TO MESSAGE-LENGTH.
            ADD  ROW-LENGTH                   TO START-ADDRESS-X.
            ADD  1                            TO MESSAGE-COUNT.
+           ADD  1                            TO ROWS-COUNT.
 
        3600-EXIT.
            EXIT.

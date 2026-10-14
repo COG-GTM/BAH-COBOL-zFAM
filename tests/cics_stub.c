@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #define RESP_NORMAL 0
 #define RESP_NOTFND 13
@@ -97,9 +99,19 @@ static void copy_rec(const struct rec *r, unsigned char *into, unsigned char *le
 
 /* ---- CICS commands -------------------------------------------------- */
 
+/*
+ * The GETMAIN area ends exactly at an inaccessible guard page, so any write
+ * past the end of the area fails with SIGSEGV instead of corrupting memory.
+ */
 int CICSGETMAIN(void **set, unsigned char *flength, unsigned char *initimg) {
+    long page = sysconf(_SC_PAGESIZE);
     int n = get_be(flength, 4);
-    *set = malloc(n);
+    long span = (n + page - 1) / page * page;
+    unsigned char *base = mmap(NULL, span + page, PROT_READ | PROT_WRITE,
+                               MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (base == MAP_FAILED) { perror("mmap"); exit(2); }
+    mprotect(base + span, page, PROT_NONE);
+    *set = base + span - n;
     memset(*set, initimg ? *initimg : 0, n);
     resp(RESP_NORMAL);
     return 0;
