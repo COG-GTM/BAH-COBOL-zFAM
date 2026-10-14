@@ -94,26 +94,6 @@
    NAME ZFAM007(R)
 /*
 //**********************************************************************
-//* Compile and link ZFAM008
-//**********************************************************************
-//ZFAM008  EXEC DFHYITVL,PROGLIB=@program_lib@,
-//         DSCTLIB=@source_lib@
-//TRN.SYSIN  DD DISP=SHR,DSN=@source_lib@(ZFAM008)
-//*
-//LKED.SYSIN DD *
-   NAME ZFAM008(R)
-/*
-//**********************************************************************
-//* Compile and link ZFAM009
-//**********************************************************************
-//ZFAM009  EXEC DFHYITVL,PROGLIB=@program_lib@,
-//         DSCTLIB=@source_lib@
-//TRN.SYSIN  DD DISP=SHR,DSN=@source_lib@(ZFAM009)
-//*
-//LKED.SYSIN DD *
-   NAME ZFAM009(R)
-/*
-//**********************************************************************
 //* Assemble and link ZFAM010
 //**********************************************************************
 //ZFAM010  EXEC DFHEITAL,PROGLIB=@program_lib@,

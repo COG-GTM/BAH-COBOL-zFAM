@@ -141,8 +141,6 @@ the supplied job or use your own job.
         1. ZFAM005  *Cobol*
         1. ZFAM006  *Assembler*
         1. ZFAM007  *Cobol*
-        1. ZFAM008  *Cobol*
-        1. ZFAM009  *Cobol*
         1. ZFAM010  *Assembler*
         1. ZFAM011  *Cobol*
         1. ZFAM020  *Assembler*

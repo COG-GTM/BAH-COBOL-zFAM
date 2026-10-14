@@ -60,7 +60,7 @@
     - keysonly  
         Optional  
         Method: GET  
-        There is no value associated with this parameter and it requests to only retrieve the key values. Primarily used with the **rows** parameter to retrieve a list of keys in the zFAM instance.
+        There is no value associated with this parameter and it requests to only retrieve the key values. Primarily used with the **rows** parameter to retrieve a list of keys in the zFAM instance. Keys are listed in ascending order with **ge**/**gt** and descending order with **le**/**lt**; any other read option is treated as **ge**.
 
     - delim=@char@  
         Optional  
