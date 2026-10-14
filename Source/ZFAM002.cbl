@@ -56,8 +56,6 @@
        01  ZFAM004                PIC  X(08) VALUE 'ZFAM004 '.
        01  ZFAM005                PIC  X(08) VALUE 'ZFAM005 '.
        01  ZFAM007                PIC  X(08) VALUE 'ZFAM007 '.
-       01  ZFAM008                PIC  X(08) VALUE 'ZFAM008 '.
-       01  ZFAM009                PIC  X(08) VALUE 'ZFAM009 '.
        01  ZFAM011                PIC  X(08) VALUE 'ZFAM011 '.
        01  ZFAM031                PIC  X(08) VALUE 'ZFAM031 '.
        01  ZFAM041                PIC  X(08) VALUE 'ZFAM041 '.
@@ -1121,16 +1119,13 @@
 
            IF  GET-CA-TYPE = 'gt'
            OR  GET-CA-TYPE = 'ge'
+           OR  GET-CA-TYPE = 'lt'
+           OR  GET-CA-TYPE = 'le'
                IF  ROWS-REQUEST = 'Y'
                    MOVE ZFAM007      TO QS-PROGRAM.
 
-           IF  GET-CA-TYPE = 'lt'
-           OR  GET-CA-TYPE = 'le'
-               IF  ROWS-REQUEST = 'Y'
-                   MOVE ZFAM008      TO QS-PROGRAM.
-
            IF  GET-CA-KEYS = 'Y'
-               MOVE ZFAM009          TO QS-PROGRAM.
+               MOVE ZFAM007          TO QS-PROGRAM.
 
            IF  QS-PROGRAM NOT = SPACES
                EXEC CICS XCTL PROGRAM(QS-PROGRAM)

@@ -696,50 +696,6 @@
 //SYSUT2    DD DISP=SHR,DSN=@source_lib@(ZFAM007)
 //SYSIN     DD DUMMY
 //**********************************************************************
-//* Modify ZFAM008 program source
-//**********************************************************************
-//STEP063  EXEC PGM=IKJEFT1B,REGION=1024K
-//SYSPRINT DD SYSOUT=*
-//SYSTSPRT DD SYSOUT=*
-//INPUT    DD DISP=SHR,DSN=@source_lib@(ZFAM008)
-//OUTPUT   DD DISP=(NEW,PASS),DSN=&&OUTPUT,
-//            UNIT=VIO,SPACE=(80,(1000,1000)),
-//            DCB=(LRECL=80,RECFM=FB)
-//STRINGS  DD DISP=SHR,DSN=@source_lib@(CONFIG)
-//SYSTSIN  DD *
- EXEC '@source_lib@(REXXREPL)'
-/*
-//**********************************************************************
-//* Replace ZFAM008 program source
-//**********************************************************************
-//STEP064   EXEC PGM=IEBGENER,REGION=1024K
-//SYSPRINT  DD SYSOUT=*
-//SYSUT1    DD DISP=(OLD,DELETE),DSN=&&OUTPUT
-//SYSUT2    DD DISP=SHR,DSN=@source_lib@(ZFAM008)
-//SYSIN     DD DUMMY
-//**********************************************************************
-//* Modify ZFAM009 program source
-//**********************************************************************
-//STEP065  EXEC PGM=IKJEFT1B,REGION=1024K
-//SYSPRINT DD SYSOUT=*
-//SYSTSPRT DD SYSOUT=*
-//INPUT    DD DISP=SHR,DSN=@source_lib@(ZFAM009)
-//OUTPUT   DD DISP=(NEW,PASS),DSN=&&OUTPUT,
-//            UNIT=VIO,SPACE=(80,(1000,1000)),
-//            DCB=(LRECL=80,RECFM=FB)
-//STRINGS  DD DISP=SHR,DSN=@source_lib@(CONFIG)
-//SYSTSIN  DD *
- EXEC '@source_lib@(REXXREPL)'
-/*
-//**********************************************************************
-//* Replace ZFAM009 program source
-//**********************************************************************
-//STEP066   EXEC PGM=IEBGENER,REGION=1024K
-//SYSPRINT  DD SYSOUT=*
-//SYSUT1    DD DISP=(OLD,DELETE),DSN=&&OUTPUT
-//SYSUT2    DD DISP=SHR,DSN=@source_lib@(ZFAM009)
-//SYSIN     DD DUMMY
-//**********************************************************************
 //* Modify ZFAM010 program source
 //**********************************************************************
 //STEP067  EXEC PGM=IKJEFT1B,REGION=1024K
