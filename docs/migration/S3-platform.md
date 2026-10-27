@@ -93,7 +93,7 @@ zfam_expiry_control(instance_id PK, last_run_at timestamptz, last_node varchar(6
                     resume_key bytea, interval_s int default 86400, restart_s int default 86400)
 sequences: zfam_ctr_<inst>, zfam_mod_<inst>
 ```
-S3 **requires** from S1's stores: KEY row `instance_id`, `key` (≤255 bytes), `ecr bool`, `abs timestamptz` (used for ECRs only; KEY `abs` also participates in row locking), and FILE segment 1 `abs`, `retention_type char(1)`, `retention int` (used for all non-ECR rows, `4000-READ-FILE` L514). Recommend S1 maintain a transactional `expires_at` on the KEY row, computed from KEY `abs` for ECRs and from FILE segment 1 `abs`/retention otherwise, recomputed whenever those values change, and indexed so the worker can do `WHERE expires_at < now()` instead of a full browse. Delete KEY + all FILE segments in one transaction.
+S3 **requires** from S1's stores: KEY row `instance_id`, `key` (≤255 bytes), `ecr bool`, `abs timestamptz`, `retention_type char(1)`, `retention int` (KEY abs+retention used for ECRs only, `3100-PROCESS-ECR` L485; KEY `abs` also participates in row locking), and FILE segment 1 `abs`, `retention_type char(1)`, `retention int` (used for all non-ECR rows, `4000-READ-FILE` L514). Recommend S1 maintain a transactional `expires_at` on the KEY row, computed as KEY `abs` + KEY retention for ECRs and FILE segment 1 `abs` + FILE retention otherwise (D = days × 86 400 s, Y = years × 31 536 000 s), recomputed whenever those values change, and indexed so the worker can do `WHERE expires_at < now()` instead of a full browse. Delete KEY + all FILE segments in one transaction.
 
 ### 2.4 Request flow (replaces ZFAM001)
 
@@ -164,7 +164,7 @@ Estimates are engineer-days for a human team. Each WP = one PR.
 6. Basic Mode passes field defs to ZFAM002 only when a non-PK field has `ID>000` (`BM_0310`).
 7. `Access-Control-Allow-Origin: *` on every response, written before any validation.
 8. Error fallback when ZFAM090 unavailable: 500, text `03-001 Service unavailable and logging disabled`, body CRLF, `text/plain`.
-9. Expiry: interval gate 86 400 s, 24 h restart, year = 365 days, ECRs use KEY-store ABS, FILE segment 1 ABS for others; for `AA`/`AS` a failed partner call leaves the record undeleted until the next cycle (`5000-DEPLICATE` nested IFs); missing FILE record aborts the whole run until next cycle (`4000-READ-FILE`).
+9. Expiry: interval gate 86 400 s, 24 h restart, year = 365 days, ECRs use KEY-store ABS + KEY retention, others FILE segment 1 ABS + FILE retention; for `AA`/`AS` a failed partner call leaves the record undeleted until the next cycle (`5000-DEPLICATE` nested IFs); missing FILE record aborts the whole run until next cycle (`4000-READ-FILE`).
 10. Counter `FAxx_ZFAM` has MAX 2^32-1 and no wrap; MODULO counter 1..99.
 11. ZFAM000 header comment refers to "zECSPLT / ZCxx" and Installation.md refers to transaction `ZPLT` while CSD defines `FPLT` — copy/paste artefacts; target uses neither.
 
