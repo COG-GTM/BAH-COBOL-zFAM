@@ -81,7 +81,7 @@ Logical or physical replication remains an option *inside* one DC for HA (PG str
 
 ## 4. VSAM → PostgreSQL data migration plan
 
-1. **Unload.** Run per instance `FAxx` inside a **write freeze**: reads stay up, while POST/PUT/DELETE on `/datastore` and the TTL task (`FPLT`/ZFAM000) are disabled. A REPRO of a live RLS KSDS is not a consistent snapshot, and a fuzzy snapshot can't be reconciled with replayed appends, which are not idempotent. Use `IDCAMS REPRO INFILE(FAxxKEY) OUTFILE(SEQ)` to an `RECFM=VB` sequential file, and the same for every `FAxxFILE` DDNAME found in `FK-DDNAME`, every `FAxxCIyy`, and `FAEXPIRE`. Also export the `FAxxFD`/`FAxxSD`/`FAxxDC` templates. Transfer **binary** (FTP `BINARY` / `quote site rdw`, or Connect:Direct) and keep RDWs. Never use ASCII transfer mode. Capture the IDCAMS `RECORDS PROCESSED` counts as control totals.
+1. **Unload.** Run per instance `FAxx` inside a **write freeze** that stops *every* writer of the instance's VSAM datasets: POST/PUT/DELETE on `/datastore`, inbound `/replicate` and `/deplicate` (FR##/FD## URIMAPs), the TTL task (`FPLT`/ZFAM000), CWR (ZFAM101), and admin jobs. If the instance has a legacy partner DC, freeze **both** sides, because legacy outbound replication never retries and a write the partner sends while `/replicate` is disabled is lost for good. Reads stay up. A REPRO of a live RLS KSDS is not a consistent snapshot, and a fuzzy snapshot can't be reconciled with replayed appends, which are not idempotent. Use `IDCAMS REPRO INFILE(FAxxKEY) OUTFILE(SEQ)` to an `RECFM=VB` sequential file, and the same for every `FAxxFILE` DDNAME found in `FK-DDNAME`, every `FAxxCIyy`, and `FAEXPIRE`. Also export the `FAxxFD`/`FAxxSD`/`FAxxDC` templates. Transfer **binary** (FTP `BINARY` / `quote site rdw`, or Connect:Direct) and keep RDWs. Never use ASCII transfer mode. Capture the IDCAMS `RECORDS PROCESSED` counts as control totals.
 2. **Parse.** The Maven module `zfam-migration` is a CLI with Spring Batch chunks. Layouts are hand-coded from `ZFAMFKC`/`ZFAMFFC`/`ZFAMCIC` (or JRecord). Codecs: `COMP` → unsigned big-endian. `COMP-3` → `BigDecimal` (sign nibble C/F = +, D = −). EBCDIC uses the CCSID agreed in Q2 (expected IBM-1047 or 037).
 3. **Transform.**
    - **Keys.** Strip trailing X'00'. Keep the EBCDIC bytes in `key` and convert to UTF-8 for `key_text`. Flag any key that doesn't round-trip.
@@ -96,12 +96,12 @@ Logical or physical replication remains an option *inside* one DC for HA (PG str
    - Orphan reports: keys without FILE (legacy 50702), FILE rows without keys, segment gaps, bad COMP-3 values.
    - HTTP sampling: 1% of keys (minimum 1,000), `GET` against both legacy and Java, comparing status, `zFAM-*` headers, and body bytes.
 7. **Cutover and rollback with dual-run** (uses §3.1 wire compatibility):
-   - (a) Deploy Java zFAM in the new DC. Set the legacy `FAxxDC` to `type: AS` pointing at Java `/replicate`. Live Basic **and** Query Mode writes then flow, since AS is the only mode in which Query Mode replicates.
+   - (a) Deploy Java zFAM in the new DC with its inbound `/replicate` already in **inbox mode**: requests are persisted in arrival order to `replication_inbox` (same columns as the outbox) and answered 200, but not applied. Leave legacy `FAxxDC` unchanged for now, so Java receives nothing yet.
    - (b) Backfill, in this order:
-     1. Start the write freeze.
-     2. Switch Java's inbound `/replicate` to **inbox mode**: requests are persisted in arrival order to `replication_inbox` (same columns as the outbox) and answered 200, but not applied.
-     3. Set legacy `FAxxDC` to AS → Java, then lift the freeze. The freeze only has to cover the unload (step 1), because every write after it is captured in the inbox.
-     4. Run the bulk load (steps 2–5) into empty final tables, so there are no PK conflicts.
+     1. Start the write freeze (step 1 scope).
+     2. Run **all** REPROs (KEY, every FILE DDNAME, CI, FAEXPIRE) and verify the IDCAMS control totals while still frozen.
+     3. Set legacy `FAxxDC` to `type: AS` → Java. Inbox capture is already active, and AS is the only mode in which Query Mode replicates. Then lift the freeze. Every write after the snapshot is captured in the inbox, and none was applied to Java early.
+     4. Parse and load the frozen unload (steps 2–5) into empty final tables, so there are no PK conflicts.
      5. Apply the inbox in order with normal handler semantics: a DELETE after the snapshot removes the row, and a replayed POST of a snapshot key gets 409, as in legacy. Deleted records can't be resurrected because no snapshot row is loaded after the deletes are applied.
      6. Switch Java to live apply.
 
