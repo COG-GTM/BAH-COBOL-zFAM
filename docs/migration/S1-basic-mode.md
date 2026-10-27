@@ -198,19 +198,19 @@ CREATE SEQUENCE zfam_blob_id_seq;                 -- replaces ZUIDSTCK TOD + DCO
 
 | ID | Title | Source | Est. (eng-days) | Depends on |
 |---|---|---|---|---|
-| S1-WP1 | Error catalog + responder | ZFAM090, HANDLE.cpy | 3 | S3 app skeleton WP |
-| S1-WP2 | Key/file store schema + repositories | ZFAMFKC, ZFAMFFC | 4 | S1-WP1; S4 data-model review |
-| S1-WP3 | Basic Mode request parsing | ZFAM002 1000–1620, ZFAMHEX | 4 | S1-WP1; S3 routing/auth WP |
+| S1-WP1 | Error catalog + responder | ZFAM090, HANDLE.cpy | 3 | S3-WP0 |
+| S1-WP2 | Key/file store schema + repositories | ZFAMFKC, ZFAMFFC | 4 | S1-WP1; S3-WP0 (S4-WP4 zfam-codec reviews the schema; not a hard blocker) |
+| S1-WP3 | Basic Mode request parsing | ZFAM002 1000–1620, ZFAMHEX | 4 | S1-WP1; S3-WP2 (front door), S3-WP3 (authentication) |
 | S1-WP4 | Single-key CRUD (non-LOB): POST/GET/PUT/DELETE, segmentation, TTL, copy-on-write PUT, ECR, `.LAT`, `ex` | ZFAM002 2000–6900 | 8 | S1-WP2, S1-WP3 |
-| S1-WP5 | UID / modulo key generation | ZFAM002 4700–4770 | 2 | S1-WP4; S3 UID + counter WP |
+| S1-WP5 | UID / modulo key generation | ZFAM002 4700–4770 | 2 | S1-WP4; S3-WP5 |
 | S1-WP6 | Row-level locking | ZFAM002 3120–3280, 6000–6080 | 4 | S1-WP4 |
 | S1-WP7 | LOB append + chunked streaming GET | ZFAM002 1600/1610, 3700–3720, 7000–7800 | 6 | S1-WP4 |
 | S1-WP8 | Single-row browse ge/gt/le/lt | ZFAM004, ZFAM005, ZFAM006 | 3 | S1-WP4 |
 | S1-WP9 | Consolidated multi-row browse | ZFAM007, ZFAM008, ZFAM009 | 6 | S1-WP8 |
 | S1-WP10 | Range DELETE | ZFAM003 | 3 | S1-WP4 |
-| S1-WP11 | Column-index hook port | ZFAM002 4800/5800/6800/6900 | 2 | S1-WP4; S2 index WP |
-| S1-WP12 | Replication hook port | ZFAM002 4500/5400/5500/6600/7600/8000–8300, ZFAM003 2000/7000 | 2 | S1-WP4, S1-WP10; S4 replication WP |
-| S1-WP13 | Basic Mode parity suite | all | 5 | S1-WP4…WP12; S4 parity harness WP |
+| S1-WP11 | Column-index hook port | ZFAM002 4800/5800/6800/6900 | 2 | S1-WP4; S2-WP4 (SecondaryIndexMaintainer) |
+| S1-WP12 | Replication hook port | ZFAM002 4500/5400/5500/6600/7600/8000–8300, ZFAM003 2000/7000 | 2 | S1-WP4, S1-WP10; S4-WP7 (ReplicationPort SPI + outbox) |
+| S1-WP13 | Basic Mode parity suite | all | 5 | S1-WP4…WP12; S4-WP1 (golden-master harness), S4-WP2 (contract catalogue) |
 | | **Total** | | **52** | |
 
 **Acceptance criteria per WP**
@@ -260,20 +260,19 @@ CREATE SEQUENCE zfam_blob_id_seq;                 -- replaces ZUIDSTCK TOD + DCO
 ## 5. Interfaces with other segments
 
 **S1 needs from S3**
-- The Spring Boot skeleton and the `FA##` → `instance_id` resolution, i.e. the URIMAP equivalent: path prefix → instance + mode.
-- The Basic Mode security decision from ZFAM001/FAxxSD. S1 assumes the request has already been authorised when it reaches the controller.
-- `UidGenerator` (ZUID001, 32-character PLAIN format).
-- `CounterService.next(name, min, max, wrap)` plus redefine (named counters).
+- **S3-WP0**: the Spring Boot skeleton. **S3-WP2** (front door): the `FA##` → `instance_id` resolution, i.e. the URIMAP equivalent: path prefix → instance + mode.
+- **S3-WP3** (authentication): the Basic Mode security decision from ZFAM001/FAxxSD. S1 assumes the request has already been authorised when it reaches the controller.
+- **S3-WP5**: `UidGenerator` (ZUID001, 32-character PLAIN format) and `CounterService.next(name, min, max, wrap)` plus redefine (named counters).
 - The L8WAIT interval config.
 - The TTL expiration job (ZFAM000). It reads `retention`, `retention_type`, `last_access` and `created_at` from S1's tables, and must apply the FF-side retention (see Q4).
 
 **S1 needs from S2**
-- `IndexHookPort` implementation (ZFAM011 insert, ZFAM031 update, ZFAM041 delete), invoked only when the instance has a FAxxFD definition (the `ZFAM-FAXXFD` container exists).
+- **S2-WP4** (`SecondaryIndexMaintainer`): the `IndexHookPort` implementation (ZFAM011 insert, ZFAM031 update, ZFAM041 delete), invoked only when the instance has a FAxxFD definition (the `ZFAM-FAXXFD` container exists).
 
 **S1 needs from S4**
-- `ReplicationPort` implementation (`/replicate`, `/deplicate`, `/datastore` path conventions, the `FA##DC` partner URL).
-- The VSAM → Postgres loader for FK/FF, including EBCDIC→UTF-8 conversion of `text` rows only, ABS → timestamptz, and TOD+NC → `blob_id`.
-- The parity harness.
+- **S4-WP7**: defines the `ReplicationPort` SPI and the outbox, and depends only on S1-WP4. S1-WP12 then wires the ZFAM002/003 AA/AS hook points into it, so the dependency runs one way, S1-WP12 → S4-WP7, with no cycle. Conventions to carry over: (`/replicate`, `/deplicate`, `/datastore` path conventions, the `FA##DC` partner URL).
+- **S4-WP4** (zfam-codec): reviews the S1-WP2 schema (advisory, not a blocker) and supplies the VSAM → Postgres loader for FK/FF, including EBCDIC→UTF-8 conversion of `text` rows only, ABS → timestamptz, and TOD+NC → `blob_id`.
+- **S4-WP1** (golden-master harness) and **S4-WP2** (contract catalogue): the parity harness used by S1-WP13.
 
 **S1 exposes**
 - `ZfamStatus` / `ZfamException` / `ZfamErrorResponder` (common error contract used by S2 and S3).
@@ -293,6 +292,7 @@ CREATE SEQUENCE zfam_blob_id_seq;                 -- replaces ZUIDSTCK TOD + DCO
 
 ## 7. Open questions
 - **Q1.** Browse order: keep EBCDIC order (generated `k_ebcdic` column) or switch to byte/ASCII order and announce the change to clients? This blocks WP2 and WP8–10.
+  - **Provisional cross-segment decision (S1, S2 and S4; pending user sign-off):** keep the legacy EBCDIC key order. Keys are stored either as EBCDIC-ordered `bytea` or with a generated EBCDIC sort column, and every browse, `RangeEnd` and range-delete query orders by it. S1-WP2 and S1-WP8–10 proceed on this basis.
 - **Q2.** ZFAM009 handles `le/lt,keysonly` as a *forward* browse. Preserve that as a bug-for-bug quirk, or fix it?
 - **Q3.** Should the multi-row Content-Type filter (text vs bits) be kept? It is invisible to most clients and probably surprising.
 - **Q4.** `1313-TTL` sets only `FF-RETENTION`. `FK-RETENTION` keeps the default of 7 years (l.1025–1034), while `ret-days` and `zFAM-TTL` set both. Which field does ZFAM000 expire on? This affects WP4 and S3.
