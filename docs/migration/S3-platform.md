@@ -93,7 +93,7 @@ zfam_expiry_control(instance_id PK, last_run_at timestamptz, last_node varchar(6
                     resume_key bytea, interval_s int default 86400, restart_s int default 86400)
 sequences: zfam_ctr_<inst>, zfam_mod_<inst>
 ```
-S3 **requires** from S1's key-store table: `instance_id`, `key` (≤255 bytes), `ecr bool`, `retention_type char(1)`, `retention int`, `abs timestamptz`, and an index on `(instance_id, key)`; recommend a derived `expires_at` column + index so the worker can do `WHERE expires_at < now()` instead of a full browse.
+S3 **requires** from S1's stores: KEY row `instance_id`, `key` (≤255 bytes), `ecr bool`, `abs timestamptz` (used for ECRs only; KEY `abs` also participates in row locking), and FILE segment 1 `abs`, `retention_type char(1)`, `retention int` (used for all non-ECR rows, `4000-READ-FILE` L514). Recommend S1 maintain a transactional `expires_at` on the KEY row, computed from KEY `abs` for ECRs and from FILE segment 1 `abs`/retention otherwise, recomputed whenever those values change, and indexed so the worker can do `WHERE expires_at < now()` instead of a full browse. Delete KEY + all FILE segments in one transaction.
 
 ### 2.4 Request flow (replaces ZFAM001)
 
@@ -101,9 +101,9 @@ S3 **requires** from S1's key-store table: `instance_id`, `key` (≤255 bytes), 
 2. `RequestLimitsFilter`: raw query string > 8192 → 414/01; path > 512 → 414/02.
 3. `InstancePathResolver` → `ZfamInstance` (unknown path → 404, matching CICS no-URIMAP behaviour).
 4. Effective scheme = request scheme honoring `X-Forwarded-Proto` from trusted proxies only.
-5. If HTTPS and prefix is `/datastore`: require `Authorization: Basic …` (failures map to `ER_40101`–`ER_40103`; WP3 pins the exact branch→reason mapping from `SY_0020`/`SY_0030`). HTTP requests and `/replicate`/`/deplicate` skip authentication (preserved quirk, §5).
+5. If HTTPS and prefix is `/datastore`: require `Authorization: Basic …` (failures map to `ER_40101`–`ER_40103`; WP3 pins the exact branch→reason mapping from `SY_0020`/`SY_0030`). HTTP requests and `/replicate`/`/deplicate` skip authentication on the wire (§5), **but secure-by-default deployment is mandatory**: `/replicate` and `/deplicate` are served only on the dedicated replication listener (legacy `@rep_port@`, `CSDZFAMR.rdo`) protected by mTLS/network policy, and return 404 on the public listeners; the plain-HTTP listener is disabled unless `zfam.http.enabled=true` and is refused for instances without an SD row outside the `dev` profile (see §5 items 1–2).
 6. Load `SecurityDefinition` + field defs (S2) for instance.
-7. Mode detect. Basic → `RowAccessAuthorizer` (§2.5) → set `fieldDefs` on ctx only if any non-PK field has `ID>000` → `BasicModeService`. Query → requires field defs (error path per `SY_0060`) → S2 parser → `FieldAccessAuthorizer` → route: POST→`insert`, GET→`select` or `selectByIndex` when WHERE starts on a secondary CI (`QS_0480`), PUT→`update`, DELETE→`delete`; unsupported methods → 405 (`ER_40501`–`ER_40505`).
+7. Mode detect. Basic → `RowAccessAuthorizer` (§2.5) → set `fieldDefs` on ctx only if any non-PK field has `ID>000` → `BasicModeService`. Query → requires field defs (error path per `SY_0060`) → S2 parser → `FieldAccessAuthorizer` → route: POST→`insert`, GET→`select`, or `selectByIndex` when **any** WHERE entry is a secondary CI (`QS_0480`–`QS_0482` scan the whole parser array), PUT→`update`, DELETE→`delete`. Unsupported methods keep the legacy stage-specific codes: Query Mode parser → 400/04 (`ER_40004`, L889), Query Mode security gate (HTTPS + SD) → 400/05 (`ER_40005`, L2666), Basic Mode SD gate (HTTPS + SD) → 400/01 (`ER_40001`, `BM_0220` L660); no blanket 405.
 
 ### 2.5 Authorization rules (exact port of `BM_0010`–`BM_0224`, `QS_*`, `howto_define_security.md`)
 
@@ -130,7 +130,7 @@ Estimates are engineer-days for a human team. Each WP = one PR.
 | **S3-WP6** | TTL expiration worker | ZFAMPLT, ZFAM000, FAEXPIRE.idcams | Scheduler per instance, advisory-lock serialization, `zfam_expiry_control` interval gating, ECR vs regular expiry using retention D/Y math (365-day year), batch delete KEY + all FILE segments (10/tx), 500-per-slice with 2 s resume, AA/AS partner `/deplicate` DELETE via S4 `ReplicationClient` (201 ⇒ adopt partner timestamp; partner failure ⇒ keep row), structured expiry log line equivalent to `TD-EXPIRE`. **AC:** Testcontainers IT with clock injection: expired rows deleted, unexpired kept, two app instances never run concurrently, resume after interruption, AA path verified with WireMock partner. | 6 | S3-WP1, S3-WP5; S1 key/file store repository WP; S4 replication client WP |
 | **S3-WP7** | Observability & runtime ops | TDQ/WTO/TRACE usage, CSDZFAMN/S/R.rdo, System Requirements | Micrometer metrics (requests by instance/mode/status, auth failures, expiry deletes, counter usage), JSON logging, OTel tracing, health/readiness incl. DB, TLS config for HTTPS listener or ingress, separate replication port/listener, Helm chart + docker-compose. **AC:** dashboards/alerts defined as code; chart deploys to kind in CI smoke test. | 5 | S3-WP0, S3-WP2, S3-WP6 |
 | **S3-WP8** | Provisioning API & CLI (replaces JCL/CSD/IDCAMS) | DEFFA##, DEFCI, DEFEXPR, FA##SD/FD/DC jcl, CONFIG/REXXREPL | `/admin/instances` CRUD (create instance, upload FD/SD/DC docs, create CI indexes via S2 DDL hook, create counters, enable expiry), protected by admin role; CLI wrapper; runbook replacing `Installation.md`. **AC:** fresh environment → instance usable end-to-end via API only; idempotent re-runs. | 4 | S3-WP1, S3-WP5, S3-WP6; S2 CI DDL WP |
-| **S3-WP9** | Front-door parity test pack | ZFAM001 (all branches), http_response_codes.md | Golden HTTP tests (status line, status text, headers) for routing/auth/limit matrix, plugged into S4's parity harness for side-by-side runs against legacy captures. **AC:** 100 % of ZFAM001 `ER_*` labels covered by at least one golden case. | 3 | S3-WP2, S3-WP3, S3-WP4; S4 parity harness WP |
+| **S3-WP9** | Front-door parity test pack | ZFAM001 (all branches), http_response_codes.md | Golden HTTP tests (status line, status text, headers) for routing/auth/limit matrix, plugged into S4's parity harness for side-by-side runs against legacy captures. **AC:** includes unsupported-method cases per stage (`ER_40001`/`ER_40004`/`ER_40005`); 100 % of ZFAM001 `ER_*` labels covered by at least one golden case. | 3 | S3-WP2, S3-WP3, S3-WP4; S4 parity harness WP |
 
 **Total ≈ 47.5 engineer-days.** Critical path: WP0 → WP1 → WP2 → WP3 → WP4 → WP9.
 
@@ -148,16 +148,16 @@ Estimates are engineer-days for a human team. Each WP = one PR.
 * `AbsTime` conversion helper (S4 data migration).
 
 **S3 needs**
-* S1: ZFAM090 status-text catalogue (`ZfamErrorCatalogue.text(status, reason, ctx)`), key/file-store repository with delete-by-key (all segments) + expiry query fields (§2.3).
-* S2: `FieldDefinitionProvider.forInstance(id)` (FAxxFD model, `Sec=nn`, `ID>000` ⇒ CI), zQL parser producing referenced fields + "WHERE starts on secondary CI" flag, CI table DDL hook for provisioning.
+* S1: ZFAM090 status-text catalogue (`ZfamErrorCatalogue.text(status, reason, ctx)`), key/file-store repository with delete-by-key (all segments) + expiry fields incl. FILE segment 1 ABS/retention or a maintained `expires_at` (§2.3).
+* S2: `FieldDefinitionProvider.forInstance(id)` (FAxxFD model, `Sec=nn`, `ID>000` ⇒ CI), zQL parser producing referenced fields + "any WHERE entry is a secondary CI" flag, CI table DDL hook for provisioning.
 * S4: `ReplicationClient.deplicateDelete(instance, key) → (status, partnerAbs)`; parity harness; security model for `/replicate` + `/deplicate` traffic; migration of ABSTIME, counters (set sequence `START` > max legacy value) and FAEXPIRE rows.
 
 ---
 
 ## 5. Behavioural quirks to preserve (or consciously change)
 
-1. **Auth only on HTTPS `/datastore`.** `SY_0010` checks `W_PATH(10)='/datastore'`; `/replicate` and `/deplicate` never read `Authorization`, and `/replicate` bypasses SD checks (`BM_0010`, `QS_0010`). Preserve on the wire, but lock down via mTLS/network policy on the replication listener.
-2. **HTTP scheme never authenticates**; with no `FAxxSD` every caller has full access (dev mode). Scheme detection behind a TLS-terminating proxy must be exact.
+1. **Auth only on HTTPS `/datastore`.** `SY_0010` checks `W_PATH(10)='/datastore'`; `/replicate` and `/deplicate` never read `Authorization`, and `/replicate` bypasses SD checks (`BM_0010`, `QS_0010`). Preserve on the wire, but only expose these prefixes on the mTLS-protected replication listener (enforced in S3-WP2/WP7; startup fails if replication routes would bind to a public listener).
+2. **HTTP scheme never authenticates**; with no `FAxxSD` every caller has full access (dev mode). Target: HTTP listener off by default; instances without an SD row are rejected at startup unless the `dev` profile is active, so anonymous writes cannot reach production. Scheme detection behind a TLS-terminating proxy must be exact.
 3. **Credential size limits**: encoded value ≤ 24 bytes, user ≤ 8, password ≤ 8, user id upper-cased (`C_DECODE`, `OC C_USER,HEX_40`). Decide whether to keep rejecting longer values (wire behaviour) or relax.
 4. Mode detection uses only the **first 3 bytes** of the query string, case-insensitive (`ZQL`).
 5. Query Mode **PUT always routes to ZFAM030**; the spanned-segment scan in `QS_0430`–`QS_0434` computes but does not change the target. `zFAM-Stream` header is read in `QS_0483` but its value is not used by ZFAM001; `ZFAM021` is never used. Do not port dead branches.
