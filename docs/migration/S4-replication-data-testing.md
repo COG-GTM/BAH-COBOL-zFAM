@@ -46,7 +46,7 @@ S4 source in scope comes to about 2.6k LOC (101/102 + replication blocks + IDCAM
 
 | Criterion | PG logical replication | App-level outbox → partner HTTP `/replicate` (**chosen**) |
 |---|---|---|
-| Can talk to a legacy zFAM DC during migration (mixed estate) | No | **Yes.** The same wire protocol lets legacy and Java act as each other's partner, which is the basis of the cutover plan in §4.6. |
+| Can talk to a legacy zFAM DC during migration (mixed estate) | No | **Yes.** The same wire protocol lets legacy and Java act as each other's partner, which is the basis of the cutover plan in §4.7. |
 | AA (before response) vs AS (after response) per instance | No (always async, all or nothing per publication) | Yes, per instance mode |
 | Deplication 201/ABS negotiation, ECR/LOB/append semantics | Not expressible | Ported 1:1 |
 | Active/active conflicts | Bidirectional (`origin=none`, PG16+) stops the apply worker on PK conflict | Same semantics as legacy (partner 409 ignored and logged), plus an optional reconciler |
@@ -57,8 +57,11 @@ Logical or physical replication remains an option *inside* one DC for HA (PG str
 **Packages and components** (`com.<org>.zfam.replication`):
 - `ReplicationProperties`: `zfam.instances.<FAxx>.replication.mode=A1|AA|AS`, `partner-url`, `timeout`, `strict-legacy=true`. This replaces `FAxxDC` and the `DOCUMENT CREATE/RETRIEVE` + `WEB PARSE` calls.
 - `ReplicationMode` enum. `ReplicationEvent` record: instance, op (POST/PUT/DELETE/APPEND/ZQL_INSERT/UPDATE/DELETE), key bytes, payload ref, media type, original query string, flags (ecr, lob, append), pk name.
-- `ReplicationService.replicate(event)`. It is called by S1/S2 services at the exact legacy points: before the response for AA, and after commit via `TransactionSynchronization.afterCommit` for AS.
-- `replication_outbox` table, written in the **same DB transaction** as the data change. Columns: `id bigserial`, `instance`, `op`, `key bytea`, `query_string`, `headers jsonb`, `status` (PENDING/SENT/FAILED), `attempts`, `last_http_status`, `created_at`. AA: the request thread dispatches immediately and marks the row SENT or FAILED. AS: the row is drained by `OutboxDispatcher` (`@Scheduled(fixedDelay=…)`, `FOR UPDATE SKIP LOCKED`). With `strict-legacy=true`, failures are logged and not retried, which matches legacy. With `false`, rows retry with backoff (recommended after cutover).
+- `ReplicationService.record(event)`, called by S1/S2 services inside the data transaction (writes the outbox row). `ReplicationService.deliverBeforeResponse()` is called after commit and before the response for AA; for AS, `TransactionSynchronization.afterCommit` wakes the dispatcher.
+- `replication_outbox` table, written in the **same DB transaction** as the data change. Columns: `id bigserial`, `instance`, `op`, `key bytea`, `query_string`, `headers jsonb`, `media_type`, **`payload bytea`** (an immutable copy of the bytes sent: the full body for POST/PUT, only the appended segment for APPEND/LOB segments, NULL for DELETE/ECR; bodies above `zfam.replication.inline-max` go to `replication_outbox_segment(outbox_id, seg_no, data)`), `status` (PENDING/SENT/FAILED), `attempts`, `last_http_status`, `created_at`, `sent_at`. Rows are self-contained, so a later update or delete of the key never changes what a pending event sends. Each instance is dispatched in `id` order, so a POST→PUT→DELETE sequence replays in order. Rows are purged once SENT.
+  - **AA:** commit the local change and its outbox row first. Then, *still on the request thread and before the response is written*, send to the partner and record SENT/FAILED in a separate transaction. A rolled-back local write therefore never reaches the partner. Legacy sends before the CICS syncpoint, so an abend after replication could leave the partner ahead; the target deliberately closes that window while keeping "partner attempted before the client sees the response."
+  - **AS:** commit, respond, then `OutboxDispatcher` (`@Scheduled(fixedDelay=…)`, `FOR UPDATE SKIP LOCKED`, one in-flight row per instance+key) drains the rows.
+  - With `strict-legacy=true`, failures are logged and not retried, which matches legacy. With `false`, rows retry with backoff (recommended after cutover).
 - `PartnerClient` (Spring `RestClient`). Rewrites `/datastore`→`/replicate`. Sets `zFAM-ECR`/`zFAM-LOB`/`zFAM-Append`. Sends UTF-8 for the text media types listed in §2.10 and raw bytes for the rest. Builds the zQL DELETE query string exactly as ZFAM102 `9998-CREATE-ZQL`.
 - `ReplicationInbound` contract for S3's front door: requests under `/replicate/**` and `/deplicate/**` skip user auth and FAxxSD checks (legacy parity), but **must** pass partner authentication (mTLS client cert or HMAC header, on a dedicated port matching `ZFAMREPL`). This is a deliberate security hardening; see R5.
 - `DeplicationClient` (used by S3's TTL job) and `DeplicationHandler` (serves `DELETE /deplicate/**`, ports ZFAM002 L2917–2983, returns `201` + 15-digit ABS).
@@ -78,7 +81,7 @@ Logical or physical replication remains an option *inside* one DC for HA (PG str
 
 ## 4. VSAM → PostgreSQL data migration plan
 
-1. **Unload.** Run per instance `FAxx`, with the instance quiesced (URIMAP disabled) or under dual-run (§4.6). Use `IDCAMS REPRO INFILE(FAxxKEY) OUTFILE(SEQ)` to an `RECFM=VB` sequential file, and the same for every `FAxxFILE` DDNAME found in `FK-DDNAME`, every `FAxxCIyy`, and `FAEXPIRE`. Also export the `FAxxFD`/`FAxxSD`/`FAxxDC` templates. Transfer **binary** (FTP `BINARY` / `quote site rdw`, or Connect:Direct) and keep RDWs. Never use ASCII transfer mode. Capture the IDCAMS `RECORDS PROCESSED` counts as control totals.
+1. **Unload.** Run per instance `FAxx` inside a **write freeze**: reads stay up, while POST/PUT/DELETE on `/datastore` and the TTL task (`FPLT`/ZFAM000) are disabled. A REPRO of a live RLS KSDS is not a consistent snapshot, and a fuzzy snapshot can't be reconciled with replayed appends, which are not idempotent. Use `IDCAMS REPRO INFILE(FAxxKEY) OUTFILE(SEQ)` to an `RECFM=VB` sequential file, and the same for every `FAxxFILE` DDNAME found in `FK-DDNAME`, every `FAxxCIyy`, and `FAEXPIRE`. Also export the `FAxxFD`/`FAxxSD`/`FAxxDC` templates. Transfer **binary** (FTP `BINARY` / `quote site rdw`, or Connect:Direct) and keep RDWs. Never use ASCII transfer mode. Capture the IDCAMS `RECORDS PROCESSED` counts as control totals.
 2. **Parse.** The Maven module `zfam-migration` is a CLI with Spring Batch chunks. Layouts are hand-coded from `ZFAMFKC`/`ZFAMFFC`/`ZFAMCIC` (or JRecord). Codecs: `COMP` → unsigned big-endian. `COMP-3` → `BigDecimal` (sign nibble C/F = +, D = −). EBCDIC uses the CCSID agreed in Q2 (expected IBM-1047 or 037).
 3. **Transform.**
    - **Keys.** Strip trailing X'00'. Keep the EBCDIC bytes in `key` and convert to UTF-8 for `key_text`. Flag any key that doesn't round-trip.
@@ -94,7 +97,15 @@ Logical or physical replication remains an option *inside* one DC for HA (PG str
    - HTTP sampling: 1% of keys (minimum 1,000), `GET` against both legacy and Java, comparing status, `zFAM-*` headers, and body bytes.
 7. **Cutover and rollback with dual-run** (uses §3.1 wire compatibility):
    - (a) Deploy Java zFAM in the new DC. Set the legacy `FAxxDC` to `type: AS` pointing at Java `/replicate`. Live Basic **and** Query Mode writes then flow, since AS is the only mode in which Query Mode replicates.
-   - (b) Backfill with the bulk load (steps 1–5), or run legacy **ZFAM101 CWR** against Java. In both cases POST-if-absent semantics mean live replicated writes are never overwritten.
+   - (b) Backfill, in this order:
+     1. Start the write freeze.
+     2. Switch Java's inbound `/replicate` to **inbox mode**: requests are persisted in arrival order to `replication_inbox` (same columns as the outbox) and answered 200, but not applied.
+     3. Set legacy `FAxxDC` to AS → Java, then lift the freeze. The freeze only has to cover the unload (step 1), because every write after it is captured in the inbox.
+     4. Run the bulk load (steps 2–5) into empty final tables, so there are no PK conflicts.
+     5. Apply the inbox in order with normal handler semantics: a DELETE after the snapshot removes the row, and a replayed POST of a snapshot key gets 409, as in legacy. Deleted records can't be resurrected because no snapshot row is loaded after the deletes are applied.
+     6. Switch Java to live apply.
+
+     The loader uses `INSERT … ON CONFLICT DO NOTHING` only so that a failed load can be re-run against a partial target; it never overwrites a newer row. **ZFAM101 CWR is not a safe live backfill.** Its race (read K → legacy deletes K → replicated DELETE is a no-op at Java → CWR POSTs K) resurrects deletes, and legacy DC rebuilds have the same exposure. Use CWR only inside a write freeze.
    - (c) Run nightly reconciliation (step 6) until zero diffs for N days.
    - (d) Shadow reads: mirror GET traffic at the load balancer and diff the responses (§5 L6).
    - (e) Flip DNS or the load balancer to Java. Set Java to `mode=AS` with `partner-url` = legacy, so the legacy side stays warm.
@@ -111,7 +122,7 @@ Logical or physical replication remains an option *inside* one DC for HA (PG str
 | L3 Contract tests per endpoint | Every documented behaviour: Basic CRUD/browse/LOB/ECR/UID/modulo/TTL/locks (`Usage.md`, `example_basic_mode.md`), zQL (`example_query_mode.md`, `howto_define_query_mode.md`), security (`howto_define_security.md`), and **each of the 94 lines in `http_response_codes.md`**, asserting HTTP status + `SSS RR-RRR` reason text | Fixture-driven. A coverage report fails CI if a code has no test. | S4-WP2 (catalogue); each segment fills in its rows |
 | L4 Replication | Two Spring contexts + two PG containers (DC-A/DC-B), plus WireMock for partner faults | A1/AA/AS ordering (response timing captured), path rewrite, no loop, ECR/LOB/append headers, query-string forwarding, Query Mode AS-only rule, deplicate 201/ABS, CWR restart/idempotency/409. **Interop:** replay `/replicate` requests captured from L1 (ZFAM101/102/002 stubs) into Java. | S4-WP11 |
 | L5 Migration | Synthetic VSAM unloads (GnuCOBOL writes VB files from the copybooks: multi-segment, LOB, orphans, ECR, binary + text media, every TTL type) → converter → PG → reconciliation must be green. Property-based tests (jqwik) for the codecs. | | S4-WP5/6 |
-| L6 Dual-run | Shadow traffic comparator and nightly reconciliation in pre-prod and prod (§4.6) | | S4-WP12 |
+| L6 Dual-run | Shadow traffic comparator and nightly reconciliation in pre-prod and prod (§4.7) | | S4-WP12 |
 | L7 Performance | Gatling: single-key GET/POST p99, browse, 32K/3.2MB/LOB append, CWR throughput, compared with legacy SLAs (Q6) | | S4-WP13 |
 
 **How other segments' WPs are verified.** Every S1/S2/S3 WP PR must (1) add or enable its rows in the L3 contract catalogue, (2) pass the L2 golden-master corpus for its endpoints, and (3) keep the L3 coverage gate green.
@@ -158,7 +169,7 @@ Logical or physical replication remains an option *inside* one DC for HA (PG str
 | S4-WP9 | Deplication | ZFAM002 L2917–2983; ZFAM000 `5000`/`7200` | Handler (201 + ABS when younger) and client. AC: L4 two-DC expiry scenarios, including partner down → local delete. | 3 | WP7, X-S3-3 |
 | S4-WP10 | CWR job | ZFAM101 | Advisory lock, keyset browse, checkpoint, ECR/LOB/append, metrics, admin endpoint. AC: copies 10k-key corpus incl. LOBs; second start returns 409; restart resumes. | 5 | WP7 |
 | S4-WP11 | Two-DC + legacy interop suite | ZFAM101/102/002 | L4 suite plus replay of `/replicate` traffic captured by WP3. AC: all modes green in CI. | 4 | WP3, WP7–10 |
-| S4-WP12 | Dual-run tooling + cutover/rollback runbook | §4.6 | Shadow comparator, nightly reconciler, runbook with go/no-go criteria. AC: rehearsal on a synthetic instance, both directions. | 6 | WP2, WP6, WP10 |
+| S4-WP12 | Dual-run tooling + cutover/rollback runbook | §4.7 | Shadow comparator, nightly reconciler, runbook with go/no-go criteria. AC: rehearsal on a synthetic instance, both directions. | 6 | WP2, WP6, WP10 |
 | S4-WP13 | Performance baseline | n/a | Gatling scenarios + report against SLAs. | 3 | WP7, S1/S2 CRUD WPs |
 
 Total: **62 engineer-days**. Critical path: WP1→WP3→WP11 and WP4→WP5→WP6→WP12.
@@ -176,6 +187,7 @@ Total: **62 engineer-days**. Critical path: WP1→WP3→WP11 and WP4→WP5→WP6
 - **R9 ABSTIME timezone.** Values may be LPAR local time, giving hour-level skew in TTL and lock tests (Q3).
 - **R10 No mainframe access** limits golden masters to the L1 oracle plus spec. HLASM paths (ZFAM001/010/020/030/040) have no executable oracle.
 - **R11 Dual-run divergence** is possible because there is no conflict resolution. Nightly reconciliation plus a defined source of truth per phase.
+- **R12 Backfill races:** live replication plus snapshot/CWR backfill can resurrect deleted or stale keys. Mitigated by the freeze + inbox ordering in §4.7(b).
 
 ## 9. Open questions
 
