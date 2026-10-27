@@ -165,7 +165,7 @@ Estimates are engineer-days for a human team. Each WP is one PR with unit tests,
 
 | ID | Title | Source | Est. | Depends on |
 |---|---|---|---|---|
-| S2-WP1 | Schema model, `zfam_field_def`, FD template importer | FA##FD.txt/.jcl, `FD_DSECT`, howto_define_query_mode.md | 3 | S3 project skeleton / Flyway baseline |
+| S2-WP1 | Schema model, `zfam_field_def`, FD template importer | FA##FD.txt/.jcl, `FD_DSECT`, howto_define_query_mode.md | 3 | S3-WP0 (project skeleton / Flyway baseline) |
 | S2-WP2 | zQL grammar, `ZqlParser`, AST, error mapping | ZFAM001 `QM_0100`–`QM_0510` | 6 | WP1 |
 | S2-WP3 | `FixedRecordCodec` + segment math | 010 `SY_0170`–`SY_0195`, 020/030/040 `SY_0170`–`SY_0220` | 3 | WP1 |
 | S2-WP4 | `zfam_column_index` + `SecondaryIndexMaintainer` | ZFAM011/031/041, ZFAMCIC/ZFAMCIA, DEFCI.jcl, ZFAMCI.idcams | 4 | WP1, WP3, S1 key/file-store WP |
