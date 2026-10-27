@@ -57,7 +57,7 @@ Logical or physical replication remains an option *inside* one DC for HA (PG str
 **Packages and components** (`com.<org>.zfam.replication`):
 - `ReplicationProperties`: `zfam.instances.<FAxx>.replication.mode=A1|AA|AS`, `partner-url`, `timeout`, `strict-legacy=true`. This replaces `FAxxDC` and the `DOCUMENT CREATE/RETRIEVE` + `WEB PARSE` calls.
 - `ReplicationMode` enum. `ReplicationEvent` record: instance, op (POST/PUT/DELETE/APPEND/ZQL_INSERT/UPDATE/DELETE), key bytes, payload ref, media type, original query string, flags (ecr, lob, append), pk name.
-- `ReplicationService.record(event)`, called by S1/S2 services inside the data transaction (writes the outbox row). `ReplicationService.deliverBeforeResponse()` is called after commit and before the response for AA; for AS, `TransactionSynchronization.afterCommit` wakes the dispatcher.
+- `ReplicationService` (implements the `ReplicationPort` SPI that S1/S2 depend on). `record(event)` is called by S1/S2 services inside the data transaction (writes the outbox row). `ReplicationService.deliverBeforeResponse()` is called after commit and before the response for AA; for AS, `TransactionSynchronization.afterCommit` wakes the dispatcher.
 - `replication_outbox` table, written in the **same DB transaction** as the data change. Columns: `id bigserial`, `instance`, `op`, `key bytea`, `query_string`, `headers jsonb`, `media_type`, **`payload bytea`** (an immutable copy of the bytes sent: the full body for POST/PUT, only the appended segment for APPEND/LOB segments, NULL for DELETE/ECR; bodies above `zfam.replication.inline-max` go to `replication_outbox_segment(outbox_id, seg_no, data)`), `status` (PENDING/SENT/FAILED), `attempts`, `last_http_status`, `created_at`, `sent_at`. Rows are self-contained, so a later update or delete of the key never changes what a pending event sends. Each instance is dispatched in `id` order, so a POST→PUT→DELETE sequence replays in order. Rows are purged once SENT.
   - **AA:** commit the local change and its outbox row first. Then, *still on the request thread and before the response is written*, send to the partner and record SENT/FAILED in a separate transaction. A rolled-back local write therefore never reaches the partner. Legacy sends before the CICS syncpoint, so an abend after replication could leave the partner ahead; the target deliberately closes that window while keeping "partner attempted before the client sees the response."
   - **AS:** commit, respond, then `OutboxDispatcher` (`@Scheduled(fixedDelay=…)`, `FOR UPDATE SKIP LOCKED`, one in-flight row per instance+key) drains the rows.
@@ -88,7 +88,7 @@ Logical or physical replication remains an option *inside* one DC for HA (PG str
    - **Payload.** Group `FAxxFILE` rows by `IDN+NC`. Order by `FF-SEGMENT`. Check the count against `FF-SEGMENTS` (non-LOB) or `FK-SEGMENTS` (LOB). Concatenate `data[0 : reclen−356]`. Convert EBCDIC→UTF-8 **only** for the text media types listed in §2.10 and leave other payloads untouched. Query Mode documents are fixed-layout per FAxxFD. `C` fields are converted. `N` fields are zoned-decimal display, so convert digits and check for a sign overpunch. The byte offsets (`Col=`) change if UTF-8 expands multibyte characters, so S2 must decide between columnar storage and a fixed-width ASCII blob (X-S2-1).
    - **TTL.** `created_at = 1900-01-01T00:00 + FF-ABS ms`, adjusted from LPAR local time to UTC (Q3). `expires_at = created_at + retention × (86400 s for 'D' | 31,536,000 s for 'Y')`, the same arithmetic as ZFAM000 L30–31 (no leap years).
    - **ECRs.** These have KEY rows only, no FILE (ZFAM000 `3100`). Expiry uses `FK-ABS`.
-4. **CI rebuild.** After the load, call S2's `ColumnIndexService.rebuild(instance)` to regenerate `zfam_ci` from documents and FAxxFD `ID>0` fields. Then diff the result against the unloaded `FAxxCIyy` rows (as a set of `(field,IDN+NC)`) and report extras or missing rows. Legacy CI drift is expected; the rebuilt index is the source of truth.
+4. **CI rebuild.** After the load, call S2's `SecondaryIndexMaintainer.rebuild(instance)` (S2-WP4) to regenerate `zfam_ci` from documents and FAxxFD `ID>0` fields. Then diff the result against the unloaded `FAxxCIyy` rows (as a set of `(field,IDN+NC)`) and report extras or missing rows. Legacy CI drift is expected; the rebuilt index is the source of truth.
 5. **Load.** `COPY` into `stg_*` tables, then `INSERT … SELECT` into the final tables in one transaction per instance. Reseed the sequences that replace named counters (`FK-FF-NC`, UID modulo; S3) to max+1.
 6. **Reconcile** (gate for every rehearsal and for the cutover):
    - Counts: KEY rows, FILE rows, segments, CI rows, per instance and DDNAME, compared with the IDCAMS totals.
@@ -133,44 +133,49 @@ Logical or physical replication remains an option *inside* one DC for HA (PG str
 ## 6. Interfaces with other segments
 
 **Needs from S1:**
-- (X-S1-1) KEY/FILE schema and repositories, with `key bytea` in EBCDIC order or an agreed collation, plus the segment/LOB storage choice.
-- (X-S1-2) Hook calls to `ReplicationService` at the ZFAM002 points listed in §1, distinguishing AA-before and AS-after response.
+- (X-S1-1, S1-WP2) KEY/FILE schema and repositories, with `key bytea` in EBCDIC order or an agreed collation, plus the segment/LOB storage choice.
+- (X-S1-2, S1-WP12, after S4-WP7) Hook calls through the `ReplicationPort` SPI at the ZFAM002 points listed in §1, distinguishing AA-before and AS-after response.
 - (X-S1-3) Exposing `ecr`/`lob`/`append` flags and the original query string.
 - (X-S1-4) ZFAM003 range-delete replication hook.
 - (X-S1-5) A FileStore read API for CWR and deplication.
 
 **Needs from S2:**
-- (X-S2-1) The document storage format (affects conversion).
-- (X-S2-2) Hooks at ZFAM010/030/040 `ZR_0010`, passing pk name and value.
-- (X-S2-3) `ColumnIndexService.rebuild(instance)`.
-- (X-S2-4) Inbound handling of `DELETE ?zql,DELETE,(WHERE(name=key))` on `/replicate`.
+- (X-S2-1, S2-WP3 `FixedRecordCodec`) The document storage format (affects conversion).
+- (X-S2-2, S2-WP7 hook SPI, S2-WP10, S2-WP11) Hooks at ZFAM010/030/040 `ZR_0010`, passing pk name and value.
+- (X-S2-3, S2-WP4) `SecondaryIndexMaintainer.rebuild(instance)`.
+- (X-S2-4, S2-WP11) Inbound handling of `DELETE ?zql,DELETE,(WHERE(name=key))` on `/replicate`.
 
 **Needs from S3:**
-- (X-S3-1) Front-door routing of the `/replicate` and `/deplicate` prefixes, with security bypass replaced by partner auth.
-- (X-S3-2) An instance config registry (replaces the `FAxx*` templates and URIMAP path).
-- (X-S3-3) The TTL job calls `DeplicationClient` and honours 201/ABS.
-- (X-S3-4) Sequences replacing named counters, with reseed support.
-- (X-S3-5) The Spring Boot skeleton, Testcontainers base, and CI pipeline.
+- (X-S3-1, S3-WP2) Front-door routing of the `/replicate` and `/deplicate` prefixes, with security bypass replaced by partner auth.
+- (X-S3-2, S3-WP1) An instance config registry (replaces the `FAxx*` templates and URIMAP path).
+- (X-S3-3, S3-WP6) The TTL job calls a `DeplicationPort`. S3-WP6 ships a no-op implementation; S4-WP9 provides the real one (201/ABS handling) and wires it.
+- (X-S3-4, S3-WP5) Sequences replacing named counters, with reseed support.
+- (X-S3-5, S3-WP0) The Spring Boot skeleton, Testcontainers base, and CI pipeline.
 
 **S4 exposes:** `ReplicationService`, `DeplicationClient`/`Handler`, the CWR admin endpoint, the `zfam-codec` library, the parity harness with fixture format, the L3 catalogue and coverage gate, and the `zfam-migration` CLI.
+
+**Provisional decisions** (coordinator, pending user sign-off):
+- **P1.** Keys are stored as EBCDIC-ordered `bytea` (R1).
+- **P2.** LOBs are stored as segment rows (`zfam_file_segment`), not a single `bytea`, to get around the 1 GB limit (R3, Q4).
+- **P3.** Strict parity first. Retries (`strict-legacy=false`), partner mTLS auth and TTL forwarding are flagged follow-ups (R4, R5, R7, Q9).
 
 ## 7. Work packages (one PR each)
 
 | ID | Title | Source | Description / acceptance criteria | Est (d) | Depends on |
 |---|---|---|---|---|---|
-| S4-WP1 | Golden-master harness | all | Fixture format, normalizers, replay runner (JUnit 5 + Testcontainers). AC: a sample fixture replays green; a mismatch gives a readable diff. | 4 | S3 skeleton (X-S3-5) |
+| S4-WP1 | Golden-master harness | all | Fixture format, normalizers, replay runner (JUnit 5 + Testcontainers). AC: a sample fixture replays green; a mismatch gives a readable diff. | 4 | S3-WP0 skeleton (X-S3-5) |
 | S4-WP2 | Contract catalogue + coverage gate | `http_response_codes.md`, `Usage.md`, `example_*.md`, `howto_*.md` | AC: 94 codes enumerated with an owner segment; CI fails on any uncovered code; Basic and zQL example flows encoded. | 5 | WP1 |
 | S4-WP3 | GnuCOBOL stubbed-CICS oracle | ZFAM002–005, 007–009, 090, 101, 102 | AC: preprocessor + C stubs; ZFAM002 POST/GET/PUT/DELETE and ZFAM101 run headless; emitted fixtures load into WP1. | 8 | WP1 |
 | S4-WP4 | `zfam-codec` | ZFAMFKC/FFC/CIC | EBCDIC (CCSID configurable), COMP, COMP-3, zoned, ABSTIME↔Instant. AC: L0 vectors pass, including negative and max values. | 3 | none |
-| S4-WP5 | VSAM unload parser/transformer | `*.idcams`, copybooks, ZFAM101 `3400/3700` | RDW parsing, segment/LOB reassembly, media-based conversion, TTL, orphan report. AC: L5 synthetic corpus parses with expected counts and reports. | 6 | WP4, X-S1-1, X-S2-1 |
-| S4-WP6 | Loader, CI rebuild, reseed, reconciliation | `DEFCI.jcl`, `ZFAMCI.idcams` | AC: COPY load and round-trip SHA-256 equal; CI diff report; sequences reseeded; HTTP sampler compares two base URLs. | 6 | WP5, X-S2-3, X-S3-4 |
-| S4-WP7 | Replication core (Basic Mode) | ZFAM002 L2299–2475, 2848–2910, 3379–3480, 3752–4060; FA##DC | Properties, outbox, `PartnerClient`, AA/AS/A1 timing, path rewrite, headers, inbound partner auth. AC: L4 Basic tests green; `strict-legacy` toggles retry. | 6 | X-S1-2/3, X-S3-1/2 |
-| S4-WP8 | Query Mode replication (ZFAM102) | ZFAM102; ZFAM010/030/040 ZR blocks | AC: AS-only rule, zQL DELETE string byte-equal to `9998-CREATE-ZQL`, full-document POST/PUT, no TTL forwarded (configurable). | 3 | WP7, X-S2-2/4 |
-| S4-WP9 | Deplication | ZFAM002 L2917–2983; ZFAM000 `5000`/`7200` | Handler (201 + ABS when younger) and client. AC: L4 two-DC expiry scenarios, including partner down → local delete. | 3 | WP7, X-S3-3 |
+| S4-WP5 | VSAM unload parser/transformer | `*.idcams`, copybooks, ZFAM101 `3400/3700` | RDW parsing, segment/LOB reassembly, media-based conversion, TTL, orphan report. AC: L5 synthetic corpus parses with expected counts and reports. | 6 | WP4, S1-WP2, S2-WP3 (`FixedRecordCodec`) |
+| S4-WP6 | Loader, CI rebuild, reseed, reconciliation | `DEFCI.jcl`, `ZFAMCI.idcams` | AC: COPY load and round-trip SHA-256 equal; CI diff report; sequences reseeded; HTTP sampler compares two base URLs. | 6 | WP5, S2-WP4 (`SecondaryIndexMaintainer.rebuild`), S3-WP5 |
+| S4-WP7 | Replication core (Basic Mode) | ZFAM002 L2299–2475, 2848–2910, 3379–3480, 3752–4060; FA##DC | Properties, outbox, `PartnerClient`, AA/AS/A1 timing, path rewrite, headers, inbound partner auth. AC: L4 Basic tests green; `strict-legacy` toggles retry. | 6 | S1-WP4, S3-WP1, S3-WP2. Defines the `ReplicationPort` SPI + outbox; S1-WP12 wires the S1 hooks afterwards. |
+| S4-WP8 | Query Mode replication (ZFAM102) | ZFAM102; ZFAM010/030/040 ZR blocks | AC: AS-only rule, zQL DELETE string byte-equal to `9998-CREATE-ZQL`, full-document POST/PUT, no TTL forwarded (configurable). | 3 | WP7, S2-WP7 (hook SPI), S2-WP10, S2-WP11 |
+| S4-WP9 | Deplication | ZFAM002 L2917–2983; ZFAM000 `5000`/`7200` | Handler (201 + ABS when younger) and client. AC: L4 two-DC expiry scenarios, including partner down → local delete. | 3 | WP7, S3-WP6 (ships a no-op `DeplicationPort`; S4-WP9 implements and wires it) |
 | S4-WP10 | CWR job | ZFAM101 | Advisory lock, keyset browse, checkpoint, ECR/LOB/append, metrics, admin endpoint. AC: copies 10k-key corpus incl. LOBs; second start returns 409; restart resumes. | 5 | WP7 |
 | S4-WP11 | Two-DC + legacy interop suite | ZFAM101/102/002 | L4 suite plus replay of `/replicate` traffic captured by WP3. AC: all modes green in CI. | 4 | WP3, WP7–10 |
 | S4-WP12 | Dual-run tooling + cutover/rollback runbook | §4.7 | Shadow comparator, nightly reconciler, runbook with go/no-go criteria. AC: rehearsal on a synthetic instance, both directions. | 6 | WP2, WP6, WP10 |
-| S4-WP13 | Performance baseline | n/a | Gatling scenarios + report against SLAs. | 3 | WP7, S1/S2 CRUD WPs |
+| S4-WP13 | Performance baseline | n/a | Gatling scenarios + report against SLAs. | 3 | WP7, S1-WP4, S2-WP8–S2-WP11 |
 
 Total: **62 engineer-days**. Critical path: WP1→WP3→WP11 and WP4→WP5→WP6→WP12.
 
