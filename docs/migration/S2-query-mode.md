@@ -169,15 +169,15 @@ Estimates are engineer-days for a human team. Each WP is one PR with unit tests,
 | S2-WP1 | Schema model, `zfam_field_def`, FD template importer | FA##FD.txt/.jcl, `FD_DSECT`, howto_define_query_mode.md | 3 | S3-WP0 (project skeleton / Flyway baseline) |
 | S2-WP2 | zQL grammar, `ZqlParser`, AST, error mapping | ZFAM001 `QM_0100`–`QM_0510` | 6 | WP1 |
 | S2-WP3 | `FixedRecordCodec` + segment math | 010 `SY_0170`–`SY_0195`, 020/030/040 `SY_0170`–`SY_0220` | 3 | WP1 |
-| S2-WP4 | `zfam_column_index` + `SecondaryIndexMaintainer` | ZFAM011/031/041, ZFAMCIC/ZFAMCIA, DEFCI.jcl, ZFAMCI.idcams | 4 | WP1, WP3, S1 key/file-store WP |
-| S2-WP5 | Field-level authorizer | ZFAM001 `QS_0010`–`QS_0310`, FA##SD | 2 | WP2, S3 auth/security-definition WP |
+| S2-WP4 | `zfam_column_index` + `SecondaryIndexMaintainer` | ZFAM011/031/041, ZFAMCIC/ZFAMCIA, DEFCI.jcl, ZFAMCI.idcams | 4 | WP1, WP3, S1-WP2 |
+| S2-WP5 | Field-level authorizer | ZFAM001 `QS_0010`–`QS_0310`, FA##SD | 2 | WP2, S3-WP1, S3-WP3 |
 | S2-WP6 | Result formatters + format negotiation | 020 `SY_0011`, `RJ_*`; 022 equivalents | 3 | WP3 |
-| S2-WP7 | `QueryModeController` + INSERT + replication SPI | ZFAM010, ZFAM001 `QS_0400`–`QS_0500` | 5 | WP2–WP5, S1 key/file-store WP, S3 front controller / UID / internal-key WP |
+| S2-WP7 | `QueryModeController` + INSERT + replication SPI | ZFAM010, ZFAM001 `QS_0400`–`QS_0500` | 5 | WP2–WP5, S1-WP2, S3-WP2, S3-WP5 |
 | S2-WP8 | SELECT by primary key | ZFAM020 | 3 | WP6, WP7 |
 | S2-WP9 | SELECT by secondary index (streaming) | ZFAM022 | 6 | WP4, WP6, WP8 |
 | S2-WP10 | UPDATE | ZFAM030 | 4 | WP4, WP7 |
 | S2-WP11 | DELETE | ZFAM040 | 2 | WP4, WP7 |
-| S2-WP12 | Query Mode parity suite | example_query_mode.md, http_response_codes.md | 4 | WP7–WP11, S4 parity harness WP |
+| S2-WP12 | Query Mode parity suite | example_query_mode.md, http_response_codes.md | 4 | WP7–WP11, S4-WP1, S4-WP2 |
 | | **Total** | | **45** | |
 
 Acceptance criteria:
@@ -265,6 +265,7 @@ Acceptance criteria:
 
 **S2 needs:**
 
+- **Ownership (coordinator decision).** S2-WP2 owns the zQL parser; S3 only routes requests whose query string starts with `?zQL`, and S3-WP4 consumes the parser output. Authorization is split: S3-WP4 owns the instance-level and row-level FAxxSD rules, and S2-WP5 owns the field-level `Sec` flags. Both use the shared FAxxSD model from S3-WP1.
 - **From S3:**
   - `ZfamRequest` (method, scheme, raw query string, body bytes, headers, authenticated principal, instance id `FAxx`, `/replicate` flag). Query Mode is detected when the query string starts with `zQL`, compared case-insensitively.
   - The front controller hands Query Mode requests to `QueryModeController.handle`.
@@ -281,7 +282,7 @@ Acceptance criteria:
   - Data-store resolver (FAxxDD → `data_store`).
   - S1's Basic Mode POST/PUT/DELETE calls S2's `SecondaryIndexMaintainer` when a schema exists. This replaces the LINKs at ZFAM002 l.2708, 3042, 3548 and 3603.
 
-- **From S4:**
+- **From S4:** S4-WP8 implements `QueryReplicationHook` from S2-WP7, and S4-WP6 calls `SecondaryIndexMaintainer.rebuild` from S2-WP4. S4-WP1/WP2 provide the parity harness used by S2-WP12.
   - Implementation of `QueryReplicationHook`.
   - Migration of FAxxFD/FAxxSD templates and FAxxCInn KSDS → `zfam_field_def` / `zfam_column_index`. CI rows can also be **rebuilt** from migrated records using `SecondaryIndexMaintainer.rebuild(instance)`; S2 provides this.
   - Parity harness and capture format.
@@ -310,7 +311,7 @@ The hook fires from `TransactionSynchronization.afterCommit`. On the mainframe, 
 ### 5.1 Top risks
 
 1. **EBCDIC vs UTF-8 collation.** CI range scans (`>`, `+`, `STARTBR GTEQ`) and row order in SELECT output currently follow EBCDIC byte order, where lower-case < upper-case < digits. UTF-8/ASCII order is digits < upper < lower. Results of `WHERE(city>M)` will differ after migration.
-   - Mitigation: decide (OQ-1) between accepting ASCII order and documenting it, or storing an EBCDIC-order sort key (`field_value_ebcdic bytea`, encoded with IBM-037).
+   - **Provisional decision (pending user sign-off), aligned with S1:** keep EBCDIC collation for CI range scans and ordering by storing an EBCDIC-order sort key (`field_value_ebcdic bytea`, encoded with IBM-037) and scanning and ordering on that column (OQ-1).
    - Field `Len` values are **byte** lengths. Multi-byte UTF-8 characters can overflow a field that held the same text as single-byte EBCDIC. The codec must truncate on a character boundary, or reject the value.
 
 2. **Wire-format quirks.** The non-standard JSON (unquoted zero-padded numbers), fixed padding, `STATUSTEXT` strings and the 206 partial-response behaviour all have to stay byte-for-byte. Spring's default JSON serializers must not be used.
@@ -343,7 +344,7 @@ The hook fires from `TransactionSynchronization.afterCommit`. On the mainframe, 
 
 ### 5.3 Open questions
 
-- **OQ-1** — Keep EBCDIC collation for CI ranges and ordering, or accept ASCII order? (Needs a business owner.)
+- **OQ-1** — *Provisionally decided, pending user sign-off:* keep EBCDIC collation for CI ranges and ordering, matching S1.
 - **OQ-2** — Make the blank-value CI policy consistent (Q10), or keep it bug-for-bug?
 - **OQ-3** — Truncate or reject over-length values on INSERT/UPDATE (Q6)? The mainframe silently truncates through `EX MVC`.
 - **OQ-4** — Should schema (FAxxFD) and security (FAxxSD) remain file-based templates (GitOps), or become DB rows managed through an admin API? The proposal is DB rows plus an importer that accepts the legacy text format.
