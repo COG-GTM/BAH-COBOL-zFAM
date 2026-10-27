@@ -13,12 +13,12 @@ This plan combines four segment plans. Each was produced by its own child Devin 
 | S1 | Basic Mode | [S1-basic-mode.md](S1-basic-mode.md) ([PR #4](https://github.com/COG-GTM/BAH-COBOL-zFAM/pull/4)) | 13 | 52 |
 | S2 | Query Mode / zQL | [S2-query-mode.md](S2-query-mode.md) ([PR #7](https://github.com/COG-GTM/BAH-COBOL-zFAM/pull/7)) | 12 | 45 |
 | S3 | Platform & security | [S3-platform.md](S3-platform.md) ([PR #5](https://github.com/COG-GTM/BAH-COBOL-zFAM/pull/5)) | 10 | 47.5 |
-| S4 | Replication, data, testing | [S4-replication-data-testing.md](S4-replication-data-testing.md) ([PR #6](https://github.com/COG-GTM/BAH-COBOL-zFAM/pull/6)) | 13 | 62 |
-| | **Total** | | **48** | **206.5** |
+| S4 | Replication, data, testing | [S4-replication-data-testing.md](S4-replication-data-testing.md) ([PR #9](https://github.com/COG-GTM/BAH-COBOL-zFAM/pull/9)) | 14 | 62 |
+| | **Total** | | **49** | **206.5** |
 
-Estimates are human engineer-days. If work were perfectly parallel, the critical path would be **52 engineer-days** (about 11 weeks):
+Estimates are human engineer-days. If work were perfectly parallel, the critical path would be **51 engineer-days** (about 10 weeks):
 
-> S3-WP0 → S2-WP1 → S3-WP1 → S3-WP2 → S3-WP3 → S1-WP3 → S1-WP4 → S4-WP7 → S4-WP10 → S4-WP12
+> S3-WP0 → S2-WP1 → S3-WP1 → S3-WP2 → S3-WP3 → S1-WP3 → S1-WP4 → S4-WP7 → S4-WP14 → S4-WP9 → S4-WP11
 
 The critical path runs through the platform front door (S3), not the business logic. Staffing S3-WP0 through S3-WP3 early is the main lever on overall duration.
 
@@ -29,8 +29,8 @@ The critical path runs through the platform front door (S3), not the business lo
 | P0 Foundations | Skeleton, codecs, schemas, test harness — unblocks everyone | 12 | 51 | day 0 → 16 |
 | P1 Platform & data layer | Front door, auth, IDs, TTL, indexes, data migration tooling | 12 | 56.5 | day 11 → 31 |
 | P2 Core API parity | Basic Mode + Query Mode endpoints, wire-compatible | 14 | 58 | day 23 → 44 |
-| P3 Replication & hardening | Two-DC replication, CWR, parity suites, perf | 9 | 35 | day 35 → 50 |
-| P4 Cutover | Dual-run, reconciliation, cutover/rollback | 1 | 6 | day 46 → 52 |
+| P3 Replication & hardening | Legacy bridge, cross-DC PG topology, parity suites, perf | 10 | 35 | day 35 → 51 |
+| P4 Cutover | Dual-run, reconciliation, cutover/rollback | 1 | 6 | day 41 → 47 |
 
 Phases are gates, not strict waves. A WP can start as soon as its dependencies have merged. Phase P2 cannot be signed off until the S4-WP1/WP2 golden-master suite passes for those endpoints.
 
@@ -42,10 +42,10 @@ Colours: blue = S1, green = S2, amber = S3, pink = S4. Thick arrows mark the cri
 flowchart LR
   subgraph P0["P0 Foundations"]
     S3_WP0["S3-WP0<br/>Project skeleton (Maven, Spring Boot…"]:::s3
-    S4_WP4["S4-WP4<br/>zfam-codec (EBCDIC, COMP, COMP-3, AB…"]:::s4
+    S4_WP4["S4-WP4<br/>zfam-codec (EBCDIC, COMP, COMP-3, zo…"]:::s4
     S1_WP1["S1-WP1<br/>Error catalog + responder (ZFAM090)"]:::s1
     S2_WP1["S2-WP1<br/>Schema model + FAxxFD importer"]:::s2
-    S4_WP1["S4-WP1<br/>Golden-master record/replay harness"]:::s4
+    S4_WP1["S4-WP1<br/>Golden-master harness + traffic capt…"]:::s4
     S1_WP2["S1-WP2<br/>Key/file store schema + JDBC reposit…"]:::s1
     S2_WP2["S2-WP2<br/>zQL grammar, ZqlParser, AST"]:::s2
     S2_WP3["S2-WP3<br/>FixedRecordCodec + segment math"]:::s2
@@ -85,18 +85,19 @@ flowchart LR
     S2_WP11["S2-WP11<br/>DELETE by PK with CI cascade"]:::s2
   end
   subgraph P3["P3 Replication & hardening"]
-    S4_WP7["S4-WP7<br/>Replication core: outbox, PartnerCli…"]:::s4
+    S4_WP7["S4-WP7<br/>ReplicationPort SPI + outbox + outbo…"]:::s4
     S1_WP12["S1-WP12<br/>Replication hook wiring (ZFAM002/003…"]:::s1
-    S4_WP8["S4-WP8<br/>Query Mode replication (ZFAM102)"]:::s4
-    S4_WP9["S4-WP9<br/>Deplication client + DeplicationPort…"]:::s4
-    S4_WP10["S4-WP10<br/>CWR copy job (ZFAM101)"]:::s4
-    S4_WP11["S4-WP11<br/>Two-DC replication + legacy wire int…"]:::s4
-    S4_WP13["S4-WP13<br/>Performance baseline (Gatling)"]:::s4
+    S4_WP8["S4-WP8<br/>Query Mode bridge hook (S2-WP7 SPI)"]:::s4
+    S4_WP14["S4-WP14<br/>Cross-DC PG topology (streaming stan…"]:::s4
+    S4_WP9["S4-WP9<br/>DeplicationPort impl (local-only, pr…"]:::s4
+    S4_WP15["S4-WP15<br/>Inbound legacy bridge, fenced handof…"]:::s4
+    S4_WP11["S4-WP11<br/>Resilience (failover/partition) + br…"]:::s4
+    S4_WP13["S4-WP13<br/>Performance baseline incl. standby-D…"]:::s4
     S1_WP13["S1-WP13<br/>Basic Mode parity suite"]:::s1
     S2_WP12["S2-WP12<br/>Query Mode parity suite"]:::s2
   end
   subgraph P4["P4 Cutover"]
-    S4_WP12["S4-WP12<br/>Dual-run tooling + cutover/rollback …"]:::s4
+    S4_WP12["S4-WP12<br/>Dual-run, cutover/rollback + bridge …"]:::s4
   end
   S3_WP0 --> S3_WP1
   S2_WP1 ==> S3_WP1
@@ -196,29 +197,35 @@ flowchart LR
   S2_WP4 --> S4_WP6
   S3_WP5 --> S4_WP6
   S1_WP4 ==> S4_WP7
-  S3_WP2 --> S4_WP7
   S3_WP1 --> S4_WP7
   S4_WP7 --> S4_WP8
   S2_WP7 --> S4_WP8
   S2_WP10 --> S4_WP8
   S2_WP11 --> S4_WP8
-  S4_WP7 --> S4_WP9
   S3_WP6 --> S4_WP9
-  S4_WP7 ==> S4_WP10
+  S4_WP14 ==> S4_WP9
   S4_WP3 --> S4_WP11
-  S4_WP7 --> S4_WP11
   S4_WP8 --> S4_WP11
-  S4_WP9 --> S4_WP11
-  S4_WP10 --> S4_WP11
+  S4_WP9 ==> S4_WP11
+  S4_WP14 --> S4_WP11
   S4_WP2 --> S4_WP12
   S4_WP6 --> S4_WP12
-  S4_WP10 ==> S4_WP12
-  S4_WP7 --> S4_WP13
+  S4_WP7 --> S4_WP12
+  S4_WP8 --> S4_WP12
+  S4_WP1 --> S4_WP13
+  S4_WP14 --> S4_WP13
   S1_WP4 --> S4_WP13
   S2_WP8 --> S4_WP13
   S2_WP9 --> S4_WP13
   S2_WP10 --> S4_WP13
   S2_WP11 --> S4_WP13
+  S3_WP0 --> S4_WP14
+  S3_WP1 --> S4_WP14
+  S4_WP7 ==> S4_WP14
+  S3_WP2 --> S4_WP15
+  S3_WP7 --> S4_WP15
+  S1_WP4 --> S4_WP15
+  S2_WP11 --> S4_WP15
   classDef s1 fill:#dbeafe,stroke:#1d4ed8
   classDef s2 fill:#dcfce7,stroke:#15803d
   classDef s3 fill:#fef3c7,stroke:#b45309
@@ -236,6 +243,8 @@ Each segment session worked without seeing the others, so their first drafts use
 | **Ownership overlap:** zQL parsing and Query Mode security both live in ZFAM001.asm (S3's program) | S2-WP2 owns the zQL parser. S3-WP2 only routes on `?zQL`. S3-WP4 consumes the parser output. |
 | **Ownership overlap:** FAxxSD authorization appeared in both S2-WP5 and S3-WP4 | S3-WP4 owns instance- and row-level rules. S2-WP5 owns field-level `Sec` flags. Both use the S3-WP1 model. |
 | Placeholder deps ("S3 skeleton WP", "S4 parity harness WP", …) | Replaced with real WP IDs (see the table in §6). |
+| **Inconsistent brief:** S4 was told partner mTLS was a follow-up, while S3 made the mTLS listener a go-live item (D2) | Aligned on D2. The legacy bridge uses the mTLS listener from go-live, and retries apply only to internal bridge traffic. |
+| **S4 first draft rejected** ([PR #6](https://github.com/COG-GTM/BAH-COBOL-zFAM/pull/6), closed): it ported ZFAM101/102 as the long-term design instead of starting from the migration goals | S4 was re-briefed goals-first and replaced it with [PR #9](https://github.com/COG-GTM/BAH-COBOL-zFAM/pull/9). The legacy `/replicate` protocol is now only a dual-run/rollback bridge (D9). The CWR copy job (old S4-WP10) is dropped. S4-WP14 (cross-DC PG topology) and an optional S4-WP15 (inbound bridge) are added. Every S4 ID that other segments reference keeps its meaning. |
 
 ## 5. Cross-cutting decisions
 
@@ -247,10 +256,11 @@ These came up in more than one segment. Each has a provisional recommendation th
 | D2 | **Unauthenticated `/replicate` and `/deplicate`**, plain-HTTP requests, and "no FAxxSD = full access" | S2 OQ-9, S3, S4 | Don't carry these over. Move replication to a dedicated mTLS listener. Grant explicit exceptions only where an instance needs one. |
 | D3 | **Identity store.** RACF password hashes can't be exported | S3 | LDAP/AD bind or an OIDC bridge, rather than re-enrolment. Keep the legacy 401 status-text semantics. |
 | D4 | **LOB storage.** Objects can reach about 2 GB, and PostgreSQL `bytea` caps at 1 GB | S1, S4 | Segment rows with streaming receive/send end to end. |
-| D5 | **Strict parity vs. improvement.** Legacy behaviour includes ignored partner failures, TTL not forwarded, Query Mode replicating only under AS, and a suspected seconds-vs-days retention bug | S4, S1 Q4, S2 OQ-2/3 | Strict parity first, proven by the golden master. Each fix goes in as a separately flagged follow-up. |
+| D5 | **Strict parity vs. improvement.** Legacy behaviour includes ignored partner failures, TTL not forwarded, Query Mode replicating only under AS, and a suspected seconds-vs-days retention bug | S4, S1 Q4, S2 OQ-2/3 | Strict parity first, proven by the golden master. Each fix goes in as a separately flagged follow-up. Under D9, TTL forwarding and Query Mode AA replication come for free in steady state, so they are flagged for sign-off. |
 | D6 | **Code vs. docs.** `http_response_codes.md` and Usage.md disagree with the code in places (e.g. 403 01-001 vs 405 05-001; UID in status text vs header) | S1 Q5/Q6, S2 OQ-8 | Treat the code as authoritative. Confirm against recorded production traffic. |
 | D7 | **Missing source:** ZFAM100 (`/zComplete`, `/zRecovery`, transaction `FZxx`) is defined in the CSD but not in the repo | S3, S4 | Out of scope until the source is located. |
 | D8 | **No mainframe** for golden-master recording | S4 | Use the GnuCOBOL + stubbed-CICS oracle (S4-WP3) for the Basic Mode COBOL. The HLASM paths (ZFAM001/010–040) need a z/OS test LPAR or recorded traffic. |
+| D9 | **Steady-state cross-DC replication.** Legacy replicates app-to-app over HTTP (`/replicate`, ZFAM101/102) | S4 (v2) | A single-writer PostgreSQL primary with a streaming standby in the other DC; the app runs active in both DCs; durability is set per instance through `ReplicationPort` (synchronous commit for AA). The legacy protocol is only a bridge during dual-run/rollback, retired per instance once the rollback window has elapsed. **Trade-off needing sign-off:** writes in the standby DC fail while the primary is unreachable, whereas legacy AA kept accepting them (and diverged). |
 
 ## 6. All work packages
 
@@ -259,10 +269,10 @@ The **bold** IDs are on the critical path. Start and finish are earliest enginee
 | WP | Title | Phase | Days | Start | Finish | Depends on |
 |---|---|---|---|---|---|---|
 | **S3-WP0** | Project skeleton (Maven, Spring Boot 3, Flyway, Testcontainers, CI) | P0 | 4 | 0 | 4 | — |
-| S4-WP4 | zfam-codec (EBCDIC, COMP, COMP-3, ABSTIME) | P0 | 3 | 0 | 3 | — |
+| S4-WP4 | zfam-codec (EBCDIC, COMP, COMP-3, zoned, ABSTIME) | P0 | 3 | 0 | 3 | — |
 | S1-WP1 | Error catalog + responder (ZFAM090) | P0 | 3 | 4 | 7 | S3-WP0 |
 | **S2-WP1** | Schema model + FAxxFD importer | P0 | 3 | 4 | 7 | S3-WP0 |
-| S4-WP1 | Golden-master record/replay harness | P0 | 4 | 4 | 8 | S3-WP0 |
+| S4-WP1 | Golden-master harness + traffic capture | P0 | 4 | 4 | 8 | S3-WP0 |
 | S1-WP2 | Key/file store schema + JDBC repositories | P0 | 4 | 7 | 11 | S1-WP1, S4-WP4 |
 | S2-WP2 | zQL grammar, ZqlParser, AST | P0 | 6 | 7 | 13 | S2-WP1 |
 | S2-WP3 | FixedRecordCodec + segment math | P0 | 3 | 7 | 10 | S2-WP1 |
@@ -296,16 +306,17 @@ The **bold** IDs are on the critical path. Start and finish are earliest enginee
 | S1-WP7 | LOB append + streaming GET (2 GB) | P2 | 6 | 35 | 41 | S1-WP4 |
 | S1-WP8 | Single-row browse ge/gt/le/lt (ZFAM004/005/006) | P2 | 3 | 35 | 38 | S1-WP4 |
 | S1-WP9 | Consolidated multi-row browse (ZFAM007/008/009) | P2 | 6 | 38 | 44 | S1-WP8 |
-| **S4-WP7** | Replication core: outbox, PartnerClient, ReplicationPort SPI | P3 | 6 | 35 | 41 | S1-WP4, S3-WP2, S3-WP1 |
+| S4-WP15 | Inbound legacy bridge, fenced handoff (optional) | P3 | 3 | 35 | 38 | S3-WP2, S3-WP7, S1-WP4, S2-WP11 |
+| **S4-WP7** | ReplicationPort SPI + outbox + outbound legacy bridge (mTLS) | P3 | 4 | 35 | 39 | S1-WP4, S3-WP1 |
+| S1-WP12 | Replication hook wiring (ZFAM002/003 AA/AS) | P3 | 2 | 39 | 41 | S1-WP4, S1-WP10, S4-WP7 |
 | S2-WP12 | Query Mode parity suite | P3 | 4 | 39 | 43 | S2-WP7, S2-WP8, S2-WP9, S2-WP10, S2-WP11, S4-WP1, S4-WP2 |
-| S1-WP12 | Replication hook wiring (ZFAM002/003 AA/AS) | P3 | 2 | 41 | 43 | S1-WP4, S1-WP10, S4-WP7 |
-| **S4-WP10** | CWR copy job (ZFAM101) | P3 | 5 | 41 | 46 | S4-WP7 |
-| S4-WP13 | Performance baseline (Gatling) | P3 | 3 | 41 | 44 | S4-WP7, S1-WP4, S2-WP8, S2-WP9, S2-WP10, S2-WP11 |
-| S4-WP8 | Query Mode replication (ZFAM102) | P3 | 3 | 41 | 44 | S4-WP7, S2-WP7, S2-WP10, S2-WP11 |
-| S4-WP9 | Deplication client + DeplicationPort impl | P3 | 3 | 41 | 44 | S4-WP7, S3-WP6 |
+| **S4-WP14** | Cross-DC PG topology (streaming standby) + DurabilityReplicationPort | P3 | 6 | 39 | 45 | S3-WP0, S3-WP1, S4-WP7 |
+| S4-WP8 | Query Mode bridge hook (S2-WP7 SPI) | P3 | 2 | 39 | 41 | S4-WP7, S2-WP7, S2-WP10, S2-WP11 |
 | S1-WP13 | Basic Mode parity suite | P3 | 5 | 44 | 49 | S1-WP4, S1-WP5, S1-WP6, S1-WP7, S1-WP8, S1-WP9, S1-WP10, S1-WP11, S1-WP12, S4-WP1, S4-WP2 |
-| S4-WP11 | Two-DC replication + legacy wire interop suite | P3 | 4 | 46 | 50 | S4-WP3, S4-WP7, S4-WP8, S4-WP9, S4-WP10 |
-| **S4-WP12** | Dual-run tooling + cutover/rollback runbook | P4 | 6 | 46 | 52 | S4-WP2, S4-WP6, S4-WP10 |
+| S4-WP13 | Performance baseline incl. standby-DC write latency | P3 | 3 | 45 | 48 | S4-WP1, S4-WP14, S1-WP4, S2-WP8, S2-WP9, S2-WP10, S2-WP11 |
+| **S4-WP9** | DeplicationPort impl (local-only, primary-only TTL) | P3 | 2 | 45 | 47 | S3-WP6, S4-WP14 |
+| **S4-WP11** | Resilience (failover/partition) + bridge interop suite | P3 | 4 | 47 | 51 | S4-WP3, S4-WP8, S4-WP9, S4-WP14 |
+| S4-WP12 | Dual-run, cutover/rollback + bridge retirement | P4 | 6 | 41 | 47 | S4-WP2, S4-WP6, S4-WP7, S4-WP8 |
 
 ## 7. Suggested team shape
 
