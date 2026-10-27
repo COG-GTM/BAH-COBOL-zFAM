@@ -75,7 +75,7 @@ Parser-array entry (`PA_DSECT`, 32 bytes, at most 256 entries = 8,192 bytes):
 | `record` | `FixedRecordCodec`: `get(byte[] rec, FieldDefinition)` and `put(rec, field, raw)`. C values are right-padded with spaces and N values left-padded with zeros. Overlapping fields are allowed. `SegmentMath` exists **only** for migration and parity (32,000-byte segments, 1-based column). | `SY_0170`–`SY_0220` segment logic (repeated in 010/020/022/030/040) |
 | `index` | `ColumnIndexRepository` (JDBC), `SecondaryIndexMaintainer` with `onInsert(schema, internalKey, newRec, skipBlank)`, `onUpdate(schema, internalKey, oldRec, newRec, changedFields)`, `onDelete(schema, internalKey, oldRec)` | ZFAM011/031/041, `CI_0010` in ZFAM010, `SY_0210`/`CI_0010`/`CI_0020` in ZFAM030, `SY_0300` in ZFAM040 |
 | `security` | `FieldLevelAuthorizer.check(principal, HttpMethod, Collection<FieldDefinition>)` → 401 `14-001` | `QS_0220`–`QS_0310` |
-| `service` | `QueryInsertService` (010), `PrimaryKeySelectService` (020), `SecondaryIndexSelectService` (022), `QueryUpdateService` (030), `QueryDeleteService` (040). Each method is `@Transactional`; one CICS task UOW maps to one DB transaction. | ZFAM010/020/022/030/040 |
+| `service` | `QueryInsertService` (010), `PrimaryKeySelectService` (020), `SecondaryIndexSelectService` (022), `QueryUpdateService` (030), `QueryDeleteService` (040). Each method is `@Transactional`; one CICS task UOW maps to one DB transaction. **Exception: `SecondaryIndexSelectService`** returns a `StreamingResponseBody`, and its callback runs after the handler has returned. The callback therefore opens its own read-only transaction (`TransactionTemplate`) and holds the connection and JDBC cursor until it finishes or fails, then closes them in `finally`. Parse, authorization and validation errors are raised **before** the body is returned, so they still become normal status codes. | ZFAM010/020/022/030/040 |
 | `web` | `QueryModeController` (Spring `@Component`, not a separate URL mapping) with `ResponseEntity<?> handle(ZfamRequest ctx)`. It parses, authorizes, routes using the `QS_0400` rules, and returns a `ResponseEntity` (plain, or `StreamingResponseBody` for chunked 022 output). | ZFAM001 `QS_0400`–`QS_0500` XCTL routing |
 | `format` | `ResultFormatter` strategy: `FixedFormatter`, `JsonFormatter`, `XmlFormatter`, `DelimitedFormatter`, plus `FormatResolver`. Content-Type of the request wins over `OPTIONS(FORMAT=)` (`ZFAM020` `SY_0011`). | `RJ_*` / XML / pipe routines in 020/022 |
 | `spi` | `QueryReplicationHook` (§4) and `QueryAuditTrace` (replaces `ENTER TRACENUM(46)`, done with Micrometer/SLF4J) | `ZR_0010`–`ZR_0099`, `TR_0010` |
@@ -125,13 +125,14 @@ CREATE UNIQUE INDEX ON zfam_field_def(instance_id, index_id) WHERE index_id > 0;
 CREATE TABLE zfam_column_index (         -- replaces every FAxxCInn KSDS
   instance_id  varchar(4)  NOT NULL,
   index_id     smallint    NOT NULL,     -- nn of FAxxCInn
-  field_value  bytea       NOT NULL,     -- fixed 56 bytes, C space-padded / N zero-padded, exact copy of record slice
+  field_value  bytea       NOT NULL,     -- exactly the field's Len bytes (≤56) copied from the record slice; no padding up to 56
   internal_key bytea       NOT NULL,     -- 8 bytes IDN+NC (S1/S3 may expose as bigint – see §4)
   data_store   char(4)     NOT NULL DEFAULT 'FILE',
   PRIMARY KEY (instance_id, index_id, field_value, internal_key),
   FOREIGN KEY (instance_id, internal_key) REFERENCES zfam_file_header(instance_id, internal_key) ON DELETE CASCADE);
 ```
 - `field_value` is stored as `bytea`, or as `text COLLATE "C"`, so that `>` / `>=` / `STARTBR GTEQ` run as a btree range scan with byte ordering.
+- **One canonical key encoding.** In the legacy 56-byte CI key, the bytes after the field length are `LOW-VALUES` (x'00'): ZFAM011/031 `MOVE LOW-VALUES TO CI-KEY` and ZFAM030 does `XC CI_FIELD,CI_FIELD`. ZFAM022 only ever compares `CA_F_LEN` bytes. So the target stores just the `Len`-byte slice. S4's import must cut each copied KSDS key to the field's `Len` (dropping the x'00' suffix); otherwise new writes and deletes would not match copied rows. Rebuilding with `SecondaryIndexMaintainer.rebuild` produces the same encoding by construction. WP12 includes a test that updates and queries a copied row.
 - The `ON DELETE CASCADE` is new behaviour. It fixes orphaned CI rows left after TTL expiry (ZFAM000 never touches CI files). The FK target name depends on S1.
 - FAxxSD field flags: S3 owns the `zfam_security_user` table (instance, userid, access_type, flags bit(33)). S2 reads flags 1–32 through the interface in §4.
 
@@ -201,13 +202,14 @@ Acceptance criteria:
 - **S2-WP4** — One maintainer that implements three different legacy behaviours, chosen by flag:
   - (a) ZFAM010/ZFAM011 do not write a CI row for blank or null values.
   - (b) ZFAM031 INSERT writes blank values too.
-  - (c) ZFAM030 writes the new row before deleting the old one, and skips the delete when the value is unchanged.
+  - (c) ZFAM030 writes the new row before deleting the old one, and skips the delete when the value is unchanged. The target **compares the old and new keys first and does nothing when they match**. Unlike a VSAM WRITE that returns DUPREC and is ignored, a PostgreSQL insert of the existing row would violate the primary key and roll back the whole update. Inserts use `ON CONFLICT DO NOTHING` so that re-indexing is idempotent.
 
   Basic Mode POST/PUT/DELETE on a table with a schema keeps the CI table correct, in the same transaction as S1's writes. A unit test exists per legacy behaviour; whether to keep the inconsistency is OQ-2.
 
 - **S2-WP5** — GET needs `Read`, POST/PUT need `Write`, DELETE needs `Delete`. **Every** field in the statement is checked, including WHERE fields and the primary key on DELETE: `flags[secSlot]` must be `x`/`X`, otherwise 401 `14-001`.
   - HTTP with FAxxSD present: GET is allowed only when `Query Mode Read Only: yea`; anything else gets 401 `11-001`/`12-001`.
-  - Requests with the `/replicate` prefix skip security.
+  - Legacy behaviour: requests with the `/replicate` prefix skip **all** security (`QS_0010`). The target does **not** trust the path. The field check is skipped only for a principal that S3 has authenticated as a replication peer (`ROLE_ZFAM_REPLICATION`, via mTLS or a service account). A `/replicate` request without that role is checked like any other request.
+  - Legacy behaviour: with no FAxxSD, anyone has full access, including anonymous writes over HTTP. The target puts this behind `zfam.security.allow-unsecured-instances` (default `false`; `true` only in dev or test profiles). With the flag off, an instance with no security definition returns 401 for writes (OQ-9).
   - The decision table in howto_define_security.md "Query Mode" is fully covered by tests.
 
 - **S2-WP6** — Request Content-Type `text/plain` | `*json` | `*xml` | `text/delimited` takes priority over `OPTIONS(FORMAT=)`.
@@ -348,4 +350,5 @@ The hook fires from `TransactionSynchronization.afterCommit`. On the mainframe, 
 - **OQ-5** — Replication timing: in-transaction (as on the mainframe) or after-commit/outbox? S4 decides.
 - **OQ-6** — Internal key type, `bytea(8)` or `bigint` (S1/S3)? The CI primary key depends on it.
 - **OQ-7** — Should `zFAM-Stream` and `MODE=OFFLINE` get real behaviour? Today they are no-ops.
+- **OQ-9** — The plan does not carry forward two legacy permissions by default: unauthenticated `/replicate` and "no FAxxSD = full access". Can any instance in production rely on either? If so, those instances need an explicit migration exception.
 - **OQ-8** — Where http_response_codes.md and the code disagree (FAxxFD missing: doc 403 `01-001`, code 405 `05-001`), which one is the contract? The plan follows the code until told otherwise.
