@@ -307,6 +307,7 @@ def prepare(program: str) -> Prepared:
             section = "PROC"
             out.append(line)
             out.append(_stmt("PERFORM ZT-MAIN THRU ZT-MAIN-EXIT."))
+            out.append("       ZT-PROGRAM-MAIN.")
             i += 1
             continue
         if section == "LINKAGE":
@@ -517,6 +518,9 @@ class Program:
         return wrap
 
     def _perform(self, target: str) -> str:
+        if target == "MAIN":
+            # The program's own mainline (statements before the first paragraph).
+            return "PERFORM ZT-PROGRAM-MAIN"
         if target not in self.prepared.paragraphs:
             raise HarnessError(f"{self.name} has no paragraph {target}")
         prefix = target.split("-")[0]
