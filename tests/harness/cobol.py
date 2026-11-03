@@ -7,7 +7,14 @@ def lit(text: str) -> str:
 
 def set_text(field: str, value: str, length_field: str | None = None) -> str:
     """MOVE a literal into ``field`` and optionally its length into another."""
-    lines = [f"MOVE {lit(value)} TO {field}"]
+    if len(value) <= 30:
+        lines = [f"MOVE {lit(value)} TO {field}"]
+    else:
+        lines = [f"MOVE SPACES TO {field}"]
+        for pos in range(0, len(value), 30):
+            chunk = value[pos:pos + 30]
+            lines.append(f"MOVE {lit(chunk)}")
+            lines.append(f"  TO {field}({pos + 1}:{len(chunk)})")
     if length_field:
         lines.append(f"MOVE {len(value)} TO {length_field}")
     return "\n".join(lines)
