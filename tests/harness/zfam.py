@@ -140,6 +140,14 @@ def _expand_copybooks(lines: list[str]) -> list[str]:
     return out
 
 
+# Bare (argument-less) options that may appear before any OPTION(arg).
+BARE_OPTIONS = {"NOHANDLE", "START", "END", "NEXT", "CHUNKEND", "CHUNKNO",
+                "CHUNKYES", "GTEQ", "EQUAL", "GENERIC", "UPDATE", "IMMEDIATE",
+                "NOSUSPEND", "NOQUEUE", "TASK", "UOW", "MAXLIFETIME",
+                "ROLLBACK", "CLOSESTATUS", "NOCLICONVERT", "CLICONVERT",
+                "SRVCONVERT", "NOSRVCONVERT"}
+
+
 def _split_options(text: str) -> tuple[list[str], list[tuple[str, str]]]:
     """Split the text of an EXEC CICS block into verb words and options."""
     text = re.sub(r"\s+\(", "(", " ".join(text.split()))
@@ -173,7 +181,7 @@ def _split_options(text: str) -> tuple[list[str], list[tuple[str, str]]]:
             arg = text[i + 1:j].strip()
             i = j + 1
             opts.append((word, arg))
-        elif not opts:
+        elif not opts and (not verb or word.upper() not in BARE_OPTIONS):
             verb.append(word)
         else:
             opts.append((word, ""))

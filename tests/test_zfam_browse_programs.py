@@ -103,3 +103,9 @@ def test_zfam000_skips_when_expiration_already_ran(r):
 def test_zfam000_first_run_writes_control_record_and_browses(r):
     assert r.calls("WRITE")
     assert r.calls("STARTBR")
+
+
+def test_bare_options_are_not_part_of_the_verb():
+    verbs = {b.verb for b in Z003.prepared.blocks}
+    assert "SYNCPOINT" in verbs
+    assert not any("NOHANDLE" in v for v in verbs)
