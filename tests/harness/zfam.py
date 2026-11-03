@@ -38,6 +38,8 @@ BUILD_DIR = Path(os.environ.get("ZT_BUILD_DIR", ROOT / "build" / "tests"))
 COBC = os.environ.get("COBC", "cobc")
 COBC_FLAGS = ["-x", "-std=ibm", "-w", "-ftrace", "-fnot-reserved=COL"]
 RUN_TIMEOUT = 20
+SET_BUFFER_SIZE = 3_300_000
+STUB_DIR = Path(__file__).resolve().parents[1] / "stubs"
 
 # Values returned by DFHRESP(); these are the documented CICS RESP codes.
 DFHRESP = {
@@ -240,6 +242,15 @@ def _cics_replacement(block: CicsBlock, period: bool) -> list[str]:
     resp = block.option("RESP")
     if resp:
         out.append(_stmt(f"MOVE ZT-RESP TO {resp}"))
+    target = block.option("SET")
+    if target and SIMPLE_ARG.match(target):
+        # GETMAIN / WEB RECEIVE / GET CONTAINER SET(ptr): hand back real storage.
+        size = block.option("FLENGTH") or str(SET_BUFFER_SIZE)
+        out.append(_stmt("IF ZT-RESP = 0"))
+        out.append(_stmt(f"    ALLOCATE {size} CHARACTERS"))
+        out.append(_stmt("        INITIALIZED RETURNING ZT-PTR"))
+        out.append(_stmt(f"    SET {target} TO ZT-PTR"))
+        out.append(_stmt("END-IF"))
     if period:
         out[-1] += "."
     return out
@@ -344,7 +355,28 @@ def prepare(program: str) -> Prepared:
         out.append(line[:7] + _resolve_dfh(line[7:72]))
         i += 1
 
-    return Prepared(program, out, blocks, paragraphs, linkage)
+    return Prepared(program, _widen_pointer_redefines(out), blocks, paragraphs, linkage)
+
+
+def _widen_pointer_redefines(lines: list[str]) -> list[str]:
+    """Make ``X REDEFINES <pointer> PIC S9(08) COMP`` 8 bytes wide.
+
+    zFAM does 31-bit address arithmetic through such redefinitions.  On a
+    64-bit host the pointer is 8 bytes, so the integer view is widened to a
+    native 64-bit binary field to keep that arithmetic correct.
+    """
+    pointers = {m.group(1) for line in lines
+                if (m := re.search(r"\b([A-Z0-9-]+)\s+USAGE\s+POINTER", line[7:72]))}
+    out = list(lines)
+    for i, line in enumerate(out):
+        m = re.search(r"REDEFINES\s+([A-Z0-9-]+)", line[7:72])
+        if not m or m.group(1) not in pointers:
+            continue
+        for j in (i, i + 1):
+            if re.search(r"PIC\s+S9\(0?8\)\s+COMP\b", out[j]):
+                out[j] = re.sub(r"PIC\s+S9\(0?8\)\s+COMP\b", "PIC S9(18) COMP-5", out[j])
+                break
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -419,7 +451,8 @@ class Result:
     @property
     def status_codes(self) -> list[int]:
         return [int(c.args["STATUSCODE"]) for c in self.cics
-                if c.verb == "WEB SEND" and c.args.get("STATUSCODE", "").strip().isdigit()]
+                if c.verb == "WEB SEND"
+                and re.fullmatch(r"[+-]?\d+", c.args.get("STATUSCODE", "").strip())]
 
 
 def _body_lines(body: str) -> list[str]:
@@ -614,13 +647,16 @@ class Program:
         if shutil.which(COBC) is None:
             raise HarnessError("GnuCOBOL (cobc) is required to run the zFAM tests")
         source = self._generate(names)
-        digest = hashlib.sha1((source + " ".join(COBC_FLAGS)).encode()).hexdigest()[:12]
+        stubs = sorted(STUB_DIR.glob("*.cbl"))
+        stub_text = "".join(p.read_text() for p in stubs)
+        digest = hashlib.sha1((source + stub_text + " ".join(COBC_FLAGS)).encode()).hexdigest()[:12]
         BUILD_DIR.mkdir(parents=True, exist_ok=True)
         src_path = BUILD_DIR / f"{self.name}.cbl"
         exe = BUILD_DIR / f"{self.name}-{digest}"
         src_path.write_text(source, encoding="latin-1")
         if not exe.exists():
-            proc = subprocess.run([COBC, *COBC_FLAGS, "-o", str(exe), str(src_path)],
+            proc = subprocess.run([COBC, *COBC_FLAGS, "-o", str(exe), str(src_path),
+                                   *map(str, stubs)],
                                   capture_output=True, text=True)
             if proc.returncode != 0:
                 raise HarnessError(f"cobc failed for {self.name}:\n{proc.stderr}")
@@ -670,6 +706,8 @@ def _parse(stdout: str) -> Result:
                 k, _, v = pair.partition("=")
                 args[k] = v
             cics.append(CicsCall(int(ident), verb, args))
+        elif line.startswith("ZT|CALL|"):
+            cics.append(CicsCall(0, "CALL", {"PROGRAM": line[len("ZT|CALL|"):].strip()}))
         elif line.startswith("ZT|OUT|"):
             _, _, name, value = line.split("|", 3)
             out[name] = value.rstrip()
