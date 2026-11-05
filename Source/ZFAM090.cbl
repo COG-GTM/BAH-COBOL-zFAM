@@ -444,6 +444,16 @@
                05  FILLER         PIC  X(16) VALUE 'during PUT/POST '.
                05  FILLER         PIC  X(16) VALUE 'process.        '.
 
+               05  FILLER         PIC  9(03) VALUE 413.
+               05  FILLER         PIC  9(02) VALUE  02.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '001'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'zQL field data e'.
+               05  FILLER         PIC  X(16) VALUE 'xceeds FAxxFD fi'.
+               05  FILLER         PIC  X(16) VALUE 'eld length while'.
+               05  FILLER         PIC  X(16) VALUE ' parsing request'.
+
                05  FILLER         PIC  9(03) VALUE 414.
                05  FILLER         PIC  9(02) VALUE  01.
                05  FILLER         PIC  X(01) VALUE '-'.
@@ -806,6 +816,26 @@
                05  FILLER         PIC  X(16) VALUE 'd not found whil'.
                05  FILLER         PIC  X(16) VALUE 'e accessing zQL '.
                05  FILLER         PIC  X(16) VALUE 'UPDATE fields   '.
+
+               05  FILLER         PIC  9(03) VALUE 413.
+               05  FILLER         PIC  9(02) VALUE  01.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '030'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'zQL UPDATE field'.
+               05  FILLER         PIC  X(16) VALUE ' data exceeds FA'.
+               05  FILLER         PIC  X(16) VALUE 'xxFD defined fie'.
+               05  FILLER         PIC  X(16) VALUE 'ld length       '.
+
+               05  FILLER         PIC  9(03) VALUE 413.
+               05  FILLER         PIC  9(02) VALUE  02.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '030'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'zQL UPDATE field'.
+               05  FILLER         PIC  X(16) VALUE ' extends beyond '.
+               05  FILLER         PIC  X(16) VALUE 'FAxxFILE record '.
+               05  FILLER         PIC  X(16) VALUE 'segment         '.
 
       *****************************************************************
       * zFAM040 messages                                              *
@@ -1541,7 +1571,7 @@
                05  FILLER         PIC  X(16) VALUE '                '.
                05  FILLER         PIC  X(16) VALUE '                '.
 
-           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 140 TIMES.
+           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 143 TIMES.
                05  STATUS-CODE    PIC  9(03).
                05  STATUS-MESSAGE.
                 10 REASON-CODE    PIC  9(02).

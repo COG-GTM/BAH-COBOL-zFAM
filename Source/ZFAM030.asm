@@ -318,6 +318,28 @@ SY_0010  DS   0H
          MVC   C_NAME,C_OPTION         Move OPTIONS table container
          MVC   C_LENGTH,S_OT_LEN       Move OPTIONS table length
          BAS   R14,GC_0020             Issue GET CONTAINER
+***********************************************************************
+* Verify every zQL field value fits within its FAxxFD field length    *
+* before any FAxxFILE record is read for UPDATE.                      *
+***********************************************************************
+SY_0012  DS   0H
+         L     R4,PA_LEN               Load parser array length
+         L     R5,PA_ADDR              Load parser array address
+         USING PA_DSECT,R5             ... tell assembler
+SY_0014  DS   0H
+         MVC   C_NAME,P_NAME           Move container name
+         BAS   R14,GC_0010             Issue GET CONTAINER for field
+         OC    C_RESP,C_RESP           Normal response?
+         BC    B'0111',SY_0016         ... no,  check next PA entry
+         ZAP   W_LENGTH,P_LEN          Move field length to work area
+         CVB   R1,W_LENGTH             Convert to binary
+         C     R1,C_LENGTH             zQL data exceeds field length?
+         BC    B'0100',ER_41301        ... yes, STATUS(413)
+SY_0016  DS   0H
+         LA    R1,E_PA                 Load parser array entry length
+         LA    R5,0(R1,R5)             Point to next PA entry
+         SR    R4,R1                   Subtract PA entry length
+         BC    B'0011',SY_0014         Continue PA scan
 *
          L     R4,PA_LEN               Load parser array length
          L     R5,PA_ADDR              Load parser array address
@@ -565,6 +587,17 @@ SY_0185  DS   0H
          BAS   R14,GC_0010             Issue GET CONTAINER for field
          ST    R1,FD_ADDR              Save field data address
          MVC   FD_LEN,C_LENGTH         Move field data length
+*
+         ZAP   W_LENGTH,P_LEN          Move field length to work area
+         CVB   R1,W_LENGTH             Convert to binary
+         C     R1,FD_LEN               zQL data exceeds field length?
+         BC    B'0100',ER_41301        ... yes, STATUS(413)
+         A     R1,W_REL_D              Add relative displacement
+         LH    R15,WF_LEN              Load FILE record length
+         LA    R14,DF_E                Load FILE header length
+         SR    R15,R14                 Data length in this segment
+         CR    R1,R15                  Field beyond end of record?
+         BC    B'0010',ER_41302        ... yes, STATUS(413)
 *
          CP    W_ID,PD_ONE             Secondary Column Index?
          BC    B'1100',SY_0188         ... no,  continue process
@@ -1171,6 +1204,25 @@ ER_40001 DS   0H
          BC    B'1111',PC_0010         Transfer control to logging
 *
 ***********************************************************************
+* STATUS(413)                                                         *
+* Back out any FAxxFILE segment already rewritten by this request.    *
+***********************************************************************
+ER_41301 DS   0H
+         EXEC CICS SYNCPOINT ROLLBACK NOHANDLE
+         MVC   C_STATUS,S_413          Set STATUS
+         MVC   C_REASON,=C'01'         Set REASON
+         BC    B'1111',PC_0010         Transfer control to logging
+***********************************************************************
+* STATUS(413)                                                         *
+* Back out any FAxxFILE segment already rewritten by this request.    *
+***********************************************************************
+ER_41302 DS   0H
+         EXEC CICS SYNCPOINT ROLLBACK NOHANDLE
+         MVC   C_STATUS,S_413          Set STATUS
+         MVC   C_REASON,=C'02'         Set REASON
+         BC    B'1111',PC_0010         Transfer control to logging
+*
+***********************************************************************
 * Define Constant fields                                              *
 ***********************************************************************
 *
@@ -1182,6 +1234,8 @@ HEX_40   DC    16XL01'40'              Spaces
 S_204    DC    CL03'204'               HTTP STATUS(204)
          DS   0F
 S_400    DC    CL03'400'               HTTP STATUS(400)
+         DS   0F
+S_413    DC    CL03'413'               HTTP STATUS(413)
          DS   0F
 ONE      DC    F'1'                    One
 FIVE     DC    F'5'                    Five
