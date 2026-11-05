@@ -22,6 +22,7 @@
 - 400 02-001 Invalid HTTP method detected during Basic Mode FAxxFD process
 - 400 02-002 Invalid URI format. Must have seven slashes.
 - 400 02-010 Primary Key and zFAM-UID are present, but zFAM-Concat is omitted.
+- 400 02-020 Primary key WHERE value is empty or exceeds FAxxFD key length.
 - 400 03-002 URI Key exceeds 255 byte maximum
 - 400 03-010 Primary Key and zFAM-Concat are present, but zFAM-UID is omitted.
 - 400 04-001 Invalid HTTP method detected during Query Mode process.
@@ -42,6 +43,7 @@
 - 400 09-002 zFAM task abended during I/O processing
 - 400 10-001 Invalid query string on POST/PUT request DFHCOMMAREA parser.
 - 400 10-002 zFAM-RangeBegin or zFAM-RangeEnd specified for DELETE request.
+- 400 11-001 WHERE value exceeds FAxxFD defined field length on SELECT.
 - 400 11-002 zFAM-RangeBegin is less than zFAM-RangeEnd for DELETE request.
 - 401 01-001 Basic Authentication credentials not present in HTTPS request
 - 401 02-001 Basic Authentication credentials invalid in HTTPS request

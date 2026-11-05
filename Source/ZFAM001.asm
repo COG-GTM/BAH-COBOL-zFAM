@@ -1563,6 +1563,12 @@ QM_0247  DS   0H
          BC    B'1100',ER_40007        Syntax error when EOQS
 *
          ST    R1,W_LENGTH             Save field length
+*
+         PACK  W_PACK,F_LEN            Pack FAxxFD field length
+         CVB   R15,W_PACK              Convert to binary
+         CR    R1,R15                  Exceed FAxxFD field length?
+         BC    B'0010',ER_40011        ... yes, STATUS(400)
+*
          BAS   R14,PC_0010             Issue PUT CONTAINER
 *
          LA    R0,QM_0247              Mark the spot
@@ -3069,6 +3075,13 @@ ER_40009 DS   0H
 ER_40010 DS   0H
          MVC   C_STATUS,S_400          Set STATUS
          MVC   C_REASON,=C'10'         Set REASON
+         BC    B'1111',ER_XCTL         Transfer control to logging
+***********************************************************************
+* STATUS(400) RETURN CODE(11)                                         *
+***********************************************************************
+ER_40011 DS   0H
+         MVC   C_STATUS,S_400          Set STATUS
+         MVC   C_REASON,=C'11'         Set REASON
          BC    B'1111',ER_XCTL         Transfer control to logging
 ***********************************************************************
 * STATUS(401) RETURN CODE(01)                                         *
