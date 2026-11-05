@@ -411,6 +411,19 @@ SY_0040  DS   0H
          ST    R9,FD_ADDR              Save field data address
          MVC   FD_LEN,C_LENGTH         Move field data length
 ***********************************************************************
+* Primary key value must be 1 to PI_LEN bytes and fit in WK_KEY.      *
+***********************************************************************
+         L     R1,FD_LEN               Load field data length
+         LTR   R1,R1                   Zero or negative length?
+         BC    B'1100',ER_40002        ... yes, STATUS(400)
+         C     R1,=A(L'WK_KEY)         Exceed key buffer length?
+         BC    B'0010',ER_40002        ... yes, STATUS(400)
+         XC    W_PDWA,W_PDWA           Clear packed decimal work area
+         MVC   W_PDWA+4(4),PI_LEN      Move primary key length
+         CVB   R15,W_PDWA              Convert key   length to binary
+         CR    R1,R15                  Exceed primary key length?
+         BC    B'0010',ER_40002        ... yes, STATUS(400)
+***********************************************************************
 * Adjust field entry length then continue tallying field lengths      *
 ***********************************************************************
 SY_0050  DS   0H
@@ -1333,6 +1346,13 @@ ER_20405 DS   0H
 ER_40001 DS   0H
          MVC   C_STATUS,S_400          Set STATUS
          MVC   C_REASON,=C'01'         Set REASON
+         BC    B'1111',PC_0010         Transfer control to logging
+***********************************************************************
+* STATUS(400)                                                         *
+***********************************************************************
+ER_40002 DS   0H
+         MVC   C_STATUS,S_400          Set STATUS
+         MVC   C_REASON,=C'02'         Set REASON
          BC    B'1111',PC_0010         Transfer control to logging
 *
 ***********************************************************************

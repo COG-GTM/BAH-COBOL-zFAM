@@ -204,6 +204,16 @@
                05  FILLER         PIC  X(16) VALUE ' request - DFHCO'.
                05  FILLER         PIC  X(16) VALUE 'MMAREA parser.  '.
 
+               05  FILLER         PIC  9(03) VALUE 400.
+               05  FILLER         PIC  9(02) VALUE  11.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '001'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'WHERE value exce'.
+               05  FILLER         PIC  X(16) VALUE 'eds FAxxFD defin'.
+               05  FILLER         PIC  X(16) VALUE 'ed field length '.
+               05  FILLER         PIC  X(16) VALUE 'on SELECT.      '.
+
                05  FILLER         PIC  9(03) VALUE 401.
                05  FILLER         PIC  9(02) VALUE  01.
                05  FILLER         PIC  X(01) VALUE '-'.
@@ -752,6 +762,16 @@
                05  FILLER         PIC  X(16) VALUE ' present in WHER'.
                05  FILLER         PIC  X(16) VALUE 'E statement on S'.
                05  FILLER         PIC  X(16) VALUE 'ELECT command.  '.
+
+               05  FILLER         PIC  9(03) VALUE 400.
+               05  FILLER         PIC  9(02) VALUE  02.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '020'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'Primary key WHER'.
+               05  FILLER         PIC  X(16) VALUE 'E value is empty'.
+               05  FILLER         PIC  X(16) VALUE ' or exceeds FAxx'.
+               05  FILLER         PIC  X(16) VALUE 'FD key length.  '.
 
       *****************************************************************
       * zFAM030 messages                                              *
@@ -1541,7 +1561,7 @@
                05  FILLER         PIC  X(16) VALUE '                '.
                05  FILLER         PIC  X(16) VALUE '                '.
 
-           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 140 TIMES.
+           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 142 TIMES.
                05  STATUS-CODE    PIC  9(03).
                05  STATUS-MESSAGE.
                 10 REASON-CODE    PIC  9(02).
