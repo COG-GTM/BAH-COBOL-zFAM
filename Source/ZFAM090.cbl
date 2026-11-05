@@ -1561,7 +1561,7 @@
                05  FILLER         PIC  X(16) VALUE '                '.
                05  FILLER         PIC  X(16) VALUE '                '.
 
-           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 149 TIMES.
+           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 142 TIMES.
                05  STATUS-CODE    PIC  9(03).
                05  STATUS-MESSAGE.
                 10 REASON-CODE    PIC  9(02).
