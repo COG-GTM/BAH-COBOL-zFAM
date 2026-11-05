@@ -503,6 +503,7 @@
        01  ZFAM-NEW-REC           PIC  X(16) VALUE 'ZFAM-NEW-REC  '.
        01  ZFAM-OLD-REC           PIC  X(16) VALUE 'ZFAM-OLD-REC  '.
        01  ZFAM-NEW-KEY           PIC  X(16) VALUE 'ZFAM-NEW-KEY  '.
+       01  ZFAM-NEW-LEN           PIC  X(16) VALUE 'ZFAM-NEW-LEN  '.
        01  ZFAM-OLD-KEY           PIC  X(16) VALUE 'ZFAM-OLD-KEY  '.
 
        01  PROCESS-DELETE         PIC  X(06) VALUE 'DELETE'.
@@ -2701,6 +2702,13 @@
            EXEC CICS PUT CONTAINER(ZFAM-NEW-KEY)
                 FROM   (FK-FF-KEY)
                 FLENGTH(LENGTH OF FK-FF-KEY)
+                CHANNEL(ZFAM-CHANNEL)
+                NOHANDLE
+           END-EXEC.
+
+           EXEC CICS PUT CONTAINER(ZFAM-NEW-LEN)
+                FROM   (RECEIVE-LENGTH)
+                FLENGTH(LENGTH OF RECEIVE-LENGTH)
                 CHANNEL(ZFAM-CHANNEL)
                 NOHANDLE
            END-EXEC.
