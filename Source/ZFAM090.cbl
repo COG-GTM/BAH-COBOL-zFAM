@@ -608,6 +608,16 @@
                05  FILLER         PIC  X(16) VALUE 'length          '.
                05  FILLER         PIC  X(16) VALUE '                '.
 
+               05  FILLER         PIC  9(03) VALUE 400.
+               05  FILLER         PIC  9(02) VALUE  08.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '010'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'zQL INSERT field'.
+               05  FILLER         PIC  X(16) VALUE ' data exceeds th'.
+               05  FILLER         PIC  X(16) VALUE 'e FAxxFD defined'.
+               05  FILLER         PIC  X(16) VALUE ' field length.  '.
+
                05  FILLER         PIC  9(03) VALUE 409.
                05  FILLER         PIC  9(02) VALUE  01.
                05  FILLER         PIC  X(01) VALUE '-'.
@@ -806,6 +816,16 @@
                05  FILLER         PIC  X(16) VALUE 'd not found whil'.
                05  FILLER         PIC  X(16) VALUE 'e accessing zQL '.
                05  FILLER         PIC  X(16) VALUE 'UPDATE fields   '.
+
+               05  FILLER         PIC  9(03) VALUE 400.
+               05  FILLER         PIC  9(02) VALUE  02.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '030'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'zQL UPDATE field'.
+               05  FILLER         PIC  X(16) VALUE ' data exceeds th'.
+               05  FILLER         PIC  X(16) VALUE 'e FAxxFD defined'.
+               05  FILLER         PIC  X(16) VALUE ' field length.  '.
 
       *****************************************************************
       * zFAM040 messages                                              *
@@ -1541,7 +1561,7 @@
                05  FILLER         PIC  X(16) VALUE '                '.
                05  FILLER         PIC  X(16) VALUE '                '.
 
-           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 140 TIMES.
+           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 142 TIMES.
                05  STATUS-CODE    PIC  9(03).
                05  STATUS-MESSAGE.
                 10 REASON-CODE    PIC  9(02).

@@ -1107,6 +1107,7 @@ QM_0136  DS   0H
          LA    R5,1(,R5)               Point to next byte
          LA    R1,1(,R1)               Increment field length
          C     R1,MAX_LEN              Field length exceed maximum?
+         BC    B'0010',ER_40006        ... yes, syntax error
          BCT   R4,QM_0136              Continue parsing
          BC    B'1111',ER_40006        Syntax error when zero
 ***********************************************************************

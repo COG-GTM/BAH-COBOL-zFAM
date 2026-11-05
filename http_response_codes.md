@@ -22,6 +22,7 @@
 - 400 02-001 Invalid HTTP method detected during Basic Mode FAxxFD process
 - 400 02-002 Invalid URI format. Must have seven slashes.
 - 400 02-010 Primary Key and zFAM-UID are present, but zFAM-Concat is omitted.
+- 400 02-030 zQL UPDATE field data exceeds the FAxxFD defined field length.
 - 400 03-002 URI Key exceeds 255 byte maximum
 - 400 03-010 Primary Key and zFAM-Concat are present, but zFAM-UID is omitted.
 - 400 04-001 Invalid HTTP method detected during Query Mode process.
@@ -36,6 +37,7 @@
 - 400 07-001 Query Mode syntax error while parsing SELECT command.
 - 400 07-002 URI Key missing on POST request
 - 400 07-010 zUID exceeds FAxxFD defined key length
+- 400 08-010 zQL INSERT field data exceeds the FAxxFD defined field length.
 - 400 08-001 Query Mode syntax error while parsing UPDATE command.
 - 400 08-002 DEFINE Named Counter for Modulo failed.
 - 400 09-001 Query Mode syntax error while parsing DELETE command.

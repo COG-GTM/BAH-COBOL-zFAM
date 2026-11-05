@@ -554,7 +554,7 @@ SY_0080  DS   0H
          LA    R15,WK_KEY              Load primary  key  address
          EX    R1,MVC_0081             Execute MVC instruction
 *
-         BC    B'1111',SY_0100         WRITE FAxxKEY
+         BC    B'1111',SY_0095         Validate field lengths
 MVC_0080 MVC   0(0,R14),0(R15)         Initial with spaces
 MVC_0081 MVC   0(0,R14),0(R15)         Move PI to key
 ***********************************************************************
@@ -588,9 +588,34 @@ SY_0090  DS   0H
          LA    R15,WK_KEY              Load primary key address
          EX    R1,MVC_0091             Execute MVC instruction
 *
-         BC    B'1111',SY_0100         WRITE FAxxKEY
+         BC    B'1111',SY_0095         Validate field lengths
 MVC_0090 MVC   0(0,R14),0(R15)         Initial with zeroes
 MVC_0091 MVC   0(0,R14),0(R15)         Move PI to key
+***********************************************************************
+* Reject the request when any zQL field data exceeds the FAxxFD       *
+* defined field length.  This is done before any I/O is issued, so    *
+* the logical record buffer is never overrun and no partial INSERT    *
+* (FAxxKEY without FAxxFILE) is left behind.                          *
+***********************************************************************
+SY_0095  DS   0H
+         L     R8,PA_LEN               Load parser   array length
+         L     R9,PA_ADDR              Load parser   array address
+         USING PA_DSECT,R9             ... tell assembler
+SY_0096  DS   0H
+         CLC   P_ID,PD_ONE             Primary index?
+         BC    B'1000',SY_0097         ... yes, validated by PK_0010
+         MVC   C_NAME,P_NAME           Move container name
+         BAS   R14,GC_0010             Issue GET CONTAINER for field
+         ZAP   W_LENGTH,P_LEN          Move field length to work area
+         CVB   R1,W_LENGTH             Convert to binary
+         C     R1,C_LENGTH             Field data exceed field length?
+         BC    B'0100',ER_40008        ... yes, STATUS(400)
+SY_0097  DS   0H
+         LA    R1,E_PA                 Load parser array entry length
+         LA    R9,0(R1,R9)             Point to next PA entry
+         SR    R8,R1                   Subtract PA entry length
+         BC    B'0011',SY_0096         Continue when more entries
+         DROP  R9                      ... tell assembler
 ***********************************************************************
 * Issue WRITE for FAxxKEY  using Primary Column Index                 *
 ***********************************************************************
@@ -649,6 +674,11 @@ SY_0170  DS   0H
          BAS   R14,GC_0010             Issue GET CONTAINER for field
          ST    R1,FC_ADDR              Save field data address
          MVC   FC_LEN,C_LENGTH         Move field data length
+*
+         ZAP   W_LENGTH,P_LEN          Move field length to work area
+         CVB   R1,W_LENGTH             Convert to binary
+         C     R1,FC_LEN               Field data exceed field length?
+         BC    B'0100',ER_40008        ... yes, STATUS(400)
 *
          CLI   P_TYPE,C'C'             Character field?
          BC    B'1000',SY_0180         ... yes, pad with spaces
@@ -1533,6 +1563,14 @@ ER_40006 DS   0H
 ER_40007 DS   0H
          MVC   C_STATUS,S_400          Set STATUS
          MVC   C_REASON,=C'07'         Set REASON
+         BC    B'1111',PC_0010         Transfer control to logging
+***********************************************************************
+* STATUS(400)                                                         *
+***********************************************************************
+ER_40008 DS   0H
+         MVC   C_STATUS,S_400          Set STATUS
+         MVC   C_REASON,=C'08'         Set REASON
+         MVC   C_FIELD,P_NAME          Set field name
          BC    B'1111',PC_0010         Transfer control to logging
 ***********************************************************************
 * STATUS(409)                                                         *
