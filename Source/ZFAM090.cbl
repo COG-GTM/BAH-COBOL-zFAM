@@ -344,6 +344,36 @@
                05  FILLER         PIC  X(16) VALUE 'thorized for req'.
                05  FILLER         PIC  X(16) VALUE 'uested field.   '.
 
+               05  FILLER         PIC  9(03) VALUE 401.
+               05  FILLER         PIC  9(02) VALUE  15.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '001'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'HTTP/GET with zF'.
+               05  FILLER         PIC  X(16) VALUE 'AM-Lock rejected'.
+               05  FILLER         PIC  X(16) VALUE '.  Row lock requ'.
+               05  FILLER         PIC  X(16) VALUE 'ires HTTPS WRITE'.
+
+               05  FILLER         PIC  9(03) VALUE 401.
+               05  FILLER         PIC  9(02) VALUE  16.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '001'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'HTTPS Basic Mode'.
+               05  FILLER         PIC  X(16) VALUE ' GET+Lock. UserI'.
+               05  FILLER         PIC  X(16) VALUE 'D not allowed WR'.
+               05  FILLER         PIC  X(16) VALUE 'ITE access      '.
+
+               05  FILLER         PIC  9(03) VALUE 401.
+               05  FILLER         PIC  9(02) VALUE  17.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '001'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'Replicate GET wi'.
+               05  FILLER         PIC  X(16) VALUE 'th zFAM-Lock not'.
+               05  FILLER         PIC  X(16) VALUE ' allowed        '.
+               05  FILLER         PIC  X(16) VALUE '                '.
+
                05  FILLER         PIC  9(03) VALUE 405.
                05  FILLER         PIC  9(02) VALUE  01.
                05  FILLER         PIC  X(01) VALUE '-'.
@@ -1541,7 +1571,7 @@
                05  FILLER         PIC  X(16) VALUE '                '.
                05  FILLER         PIC  X(16) VALUE '                '.
 
-           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 140 TIMES.
+           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 143 TIMES.
                05  STATUS-CODE    PIC  9(03).
                05  STATUS-MESSAGE.
                 10 REASON-CODE    PIC  9(02).

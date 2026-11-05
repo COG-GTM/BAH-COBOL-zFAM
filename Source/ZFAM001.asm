@@ -19,6 +19,7 @@
 *              HTTP in Basic Mode is allowed under the following rules:
 *                1).  Only for GET requests, and
 *                2).  Only when Basic Mode Read Only is enabled
+*                3).  Not when the GET includes zFAM-Lock: yes
 *
 *              HTTP in Query Mode is allowed under the following rules:
 *                1).  Only for GET requests, and
@@ -95,6 +96,12 @@ W_PREFIX DS    CL01               URI prefix
 *                                 X'FF'.  This will be used to allow
 *                                 HTTP requests for both BM and QM
 *
+W_LOCK   DS    CL01               GET row level lock indicator
+*                                 Set to C'Y' when a GET request
+*                                 contains zFAM-Lock: yes.  ZFAM002
+*                                 updates the KEY store for this
+*                                 request, so it requires WRITE.
+*
 ***********************************************************************
 * WEB EXTRACT fields                                                  *
 ***********************************************************************
@@ -126,6 +133,12 @@ A_VAL_L  EQU   *-A_VALUE          HTTP header value field length
          DS   0F
 Z_VALUE  DS    CL03               HTTP header value
 Z_VAL_L  EQU   *-Z_VALUE          HTTP header value field length
+***********************************************************************
+* READ HTTPHEADER fields - zFAM-Lock                                  *
+***********************************************************************
+         DS   0F
+K_VALUE  DS    CL03               HTTP header value
+K_VAL_L  EQU   *-K_VALUE          HTTP header value field length
 ***********************************************************************
 * WEB RECEIVE fields                                                  *
 ***********************************************************************
@@ -555,7 +568,10 @@ SY_0090  DS   0H
 *             XCTL ZFAM002                                            *
 *         When FAxxSD is  defined (QA and production)                 *
 *             When Basic Mode Read Only is enabled                    *
-*                 XCTL ZFAM002                                        *
+*                 When zFAM-Lock: yes (row level lock)                *
+*                     WEB SEND STATUS(401)                            *
+*                 Otherwise                                           *
+*                     XCTL ZFAM002                                    *
 *             When Basic Mode Read Only is disabled                   *
 *                 WEB SEND STATUS(401)                                *
 *     When PUT, POST, DELETE                                          *
@@ -567,6 +583,15 @@ SY_0090  DS   0H
 *         Compare UserID with FAxxSD                                  *
 *         When UserID not equal security level for type of access     *
 *             WEB SEND STATUS(401)                                    *
+*         When GET with zFAM-Lock: yes (row level lock)               *
+*             UserID must have both Read and Write access, as         *
+*             ZFAM002 updates the KEY store to record the lock        *
+*             When UserID does not have Write access                  *
+*                 WEB SEND STATUS(401)                                *
+*                                                                     *
+* When URI prefix is /replicate                                       *
+*     When GET with zFAM-Lock: yes (never sent by replication)        *
+*         WEB SEND STATUS(401)                                        *
 *                                                                     *
 * End of security                                                     *
 *                                                                     *
@@ -585,8 +610,14 @@ SY_0090  DS   0H
 *                                                                     *
 ***********************************************************************
 BM_0010  DS   0H
+         BAS   R14,BM_0050             Check for GET row level lock
          CLI   W_PREFIX,X'FF'          URI '/replicate' prefix?
-         BC    B'1000',BM_0300         ... yes, bypass security
+         BC    B'0111',BM_0020         ... no,  execute security
+         CLI   W_LOCK,C'Y'             GET row level lock requested?
+         BC    B'1000',ER_40117        ... yes, STATUS(401)
+         BC    B'1111',BM_0300         ... no,  bypass security
+*
+BM_0020  DS   0H
 *
          L     R9,SD_GM                Load FAxxSD address
          USING SD_DSECT,R9             ... tell assembler
@@ -608,9 +639,11 @@ BM_0110  DS   0H
 *        BC    B'0111',BM_0500         ... no,  XCTL to ZFAM002
          OC    B_STATUS,HEX_40         Set upper case bits
          CLC   B_STATUS,S_YEA          BM Read Only enabled?
-         BC    B'1000',BM_0300         ... yes, Check for FAxxFD
-*        BC    B'1000',BM_0500         ... yes, XCTL to ZFAM002
          BC    B'0111',ER_40104        ... no,  STATUS(401)
+         CLI   W_LOCK,C'Y'             GET row level lock requested?
+         BC    B'1000',ER_40115        ... yes, STATUS(401)
+         BC    B'1111',BM_0300         ... no,  Check for FAxxFD
+*        BC    B'1111',BM_0500         ... no,  XCTL to ZFAM002
 ***********************************************************************
 * SCHEME is HTTP  and this is a PUT, POST, DELETE request             *
 ***********************************************************************
@@ -678,8 +711,10 @@ BM_0222  DS   0H
          BC    B'0111',BM_0211         ... no,  continue search
          OI    S_LEVELS,X'40'          Set upper case bit
          CLI   S_LEVELS,C'X'           Row level (0) set?
-         BC    B'1000',BM_0300         ... yes, continue validation
-         BC    B'1111',ER_40108        ... no,  STATUS(401)
+         BC    B'0111',ER_40108        ... no,  STATUS(401)
+         CLI   W_LOCK,C'Y'             GET row level lock requested?
+         BC    B'0111',BM_0300         ... no,  continue validation
+         BC    B'1111',BM_0230         ... yes, check Write access
 ***********************************************************************
 * FAxxSD security entry must match HTTP METHOD                        *
 * PUT    must match request type of 'Write '                          *
@@ -702,6 +737,67 @@ BM_0224  DS   0H
          CLI   S_LEVELS,C'X'           Row level (0) set?
          BC    B'1000',BM_0300         ... yes, continue validation
          BC    B'1111',ER_40110        ... no,  STATUS(401)
+***********************************************************************
+* GET with zFAM-Lock: yes (row level lock).                           *
+* ZFAM002 issues READ UPDATE and REWRITE on the KEY store to record   *
+* the lock, which blocks PUT requests from other clients until the    *
+* lock expires.  In addition to the Read entry matched above, the     *
+* UserID must have a Write entry with row level access.               *
+***********************************************************************
+BM_0230  DS   0H
+         L     R9,SD_GM                Load FAxxSD address
+         LA    R4,E_USER               Load user  entry length
+         L     R5,SD_LEN               Load SD template length
+         LA    R6,E_PREFIX             Load SD prefix length
+         SR    R5,R6                   Subtract prefix length
+         AR    R9,R6                   Point to User entry
+*
+BM_0231  DS   0H
+         CLC   S_USER,C_USER           UserID match FAxxSD?
+         BC    B'0111',BM_0232         ... no,  continue search
+         OC    S_TYPE,HEX_40           Set upper case bits
+         CLC   S_TYPE,S_WRITE          Security entry for 'Write'?
+         BC    B'0111',BM_0232         ... no,  continue search
+         OI    S_LEVELS,X'40'          Set upper case bit
+         CLI   S_LEVELS,C'X'           Row level (0) set?
+         BC    B'1000',BM_0300         ... yes, continue validation
+         BC    B'1111',ER_40116        ... no,  STATUS(401)
+BM_0232  DS   0H
+         LA    R9,0(R4,R9)             Point to next entry
+         SR    R5,R4                   Subtract user entry length
+         BC    B'0010',BM_0231         Continue search
+         BC    B'1111',ER_40116        EOT, STATUS(401)
+*
+***********************************************************************
+* Determine whether this is a GET request for a row level lock.       *
+* ZFAM002 only locks when the zFAM-Lock header value is 'yes'.        *
+***********************************************************************
+BM_0050  DS   0H
+         ST    R14,BAS_REG             Save return register
+         MVI   W_LOCK,C'N'             Set lock indicator off
+         CLC   W_METHOD(3),S_GET       GET request?
+         BC    B'0111',BM_0059         ... no,  return
+*
+         MVC   K_VALUE,HEX_40          Initialize header value
+         LA    R1,K_LENGTH             Load header name  length
+         ST    R1,L_HEADER             Save header name  length
+         LA    R1,K_VAL_L              Load value  field length
+         ST    R1,V_LENGTH             Save value  field length
+*
+         EXEC CICS WEB READ HTTPHEADER(K_HEADER)                       X
+               NAMELENGTH(L_HEADER)                                    X
+               VALUE(K_VALUE)                                          X
+               VALUELENGTH(V_LENGTH)                                   X
+               NOHANDLE
+*
+         OC    EIBRESP,EIBRESP         Normal response?
+         BC    B'0111',BM_0059         ... no,  return
+         CLC   K_VALUE,S_LOCK          zFAM-Lock: yes?
+         BC    B'0111',BM_0059         ... no,  return
+         MVI   W_LOCK,C'Y'             ... yes, set lock indicator on
+BM_0059  DS   0H
+         L     R14,BAS_REG             Load return register
+         BCR   B'1111',R14             Return to caller
 *
 ***********************************************************************
 * At this point, all validation rules have been performed for         *
@@ -3169,6 +3265,27 @@ ER_40114 DS   0H
          MVC   C_REASON,=C'14'         Set REASON
          BC    B'1111',ER_XCTL         Transfer control to logging
 ***********************************************************************
+* STATUS(401) RETURN CODE(15)                                         *
+***********************************************************************
+ER_40115 DS   0H
+         MVC   C_STATUS,S_401          Set STATUS
+         MVC   C_REASON,=C'15'         Set REASON
+         BC    B'1111',ER_XCTL         Transfer control to logging
+***********************************************************************
+* STATUS(401) RETURN CODE(16)                                         *
+***********************************************************************
+ER_40116 DS   0H
+         MVC   C_STATUS,S_401          Set STATUS
+         MVC   C_REASON,=C'16'         Set REASON
+         BC    B'1111',ER_XCTL         Transfer control to logging
+***********************************************************************
+* STATUS(401) RETURN CODE(17)                                         *
+***********************************************************************
+ER_40117 DS   0H
+         MVC   C_STATUS,S_401          Set STATUS
+         MVC   C_REASON,=C'17'         Set REASON
+         BC    B'1111',ER_XCTL         Transfer control to logging
+***********************************************************************
 * STATUS(405) RETURN CODE(01)                                         *
 ***********************************************************************
 ER_40501 DS   0H
@@ -3446,6 +3563,11 @@ A_LENGTH EQU   *-A_HEADER              HTTP header field length
          DS   0F
 Z_HEADER DC    CL11'zFAM-Stream'       HTTP header (zFAM-Stream)
 Z_LENGTH EQU   *-Z_HEADER              HTTP header field length
+         DS   0F
+K_HEADER DC    CL09'zFAM-Lock'         HTTP header (zFAM-Lock)
+K_LENGTH EQU   *-K_HEADER              HTTP header field length
+         DS   0F
+S_LOCK   DC    CL03'yes'               zFAM-Lock value for row lock
          DS   0F
 M_ACAO_L DC    F'01'                   HTTP value  length
 M_ACAO   DC    CL01'*'                 HTTP value  field
