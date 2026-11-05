@@ -283,11 +283,12 @@ To define the replication port, submit CSDZFAMR in the JCL library to define the
 the job has completed, install the ZFAMREPL definition. This should be done in both the primary and alternate environments.
 
 The replication URIMAPs for each instance (FA##R for /replicate and FA##D for /deplicate) are defined with
-SCHEME(HTTP) and PORT(@rep_port@), so CICS only selects them for requests arriving on the ZFAMREPL TCPIPService.
+SCHEME(HTTP) and TCPIPSERVICE(ZFAMREPL), so CICS only selects them for requests received on the ZFAMREPL TCPIPService.
+The match is on the receiving TCPIPService, not on the port in the request's Host header.
 Requests for /replicate or /deplicate sent to the http or https data ports do not match these URIMAPs and are not
 routed to ZFAM001. Because the replication port does not authenticate, restrict access to it at the network layer so
 only the opposing environment can connect. Verify with CEMT INQUIRE URIMAP(FA##R) and CEMT INQUIRE URIMAP(FA##D) that
-the port is set to the replication port.
+the TCPIPService is ZFAMREPL. Install ZFAMREPL in every region that installs the FA## group and receives replication.
 
 To enable replication for an instance of ZFAM, edit FA##DC in the JCL library and modify the SYSUT1 DD. The valid values
 for type are AA, AS and A1. AA is for active-active replication. AS is for active-standby and A1 is stand alone. The
