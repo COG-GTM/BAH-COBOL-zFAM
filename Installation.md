@@ -282,9 +282,18 @@ number.
 To define the replication port, submit CSDZFAMR in the JCL library to define the ZFAMREPL TCPIPService definition. After
 the job has completed, install the ZFAMREPL definition. This should be done in both the primary and alternate environments.
 
+The replication URIMAPs for each instance (FA##R for /replicate and FA##D for /deplicate) are defined with
+SCHEME(HTTP) and TCPIPSERVICE(ZFAMREPL), so CICS only selects them for requests received on the ZFAMREPL TCPIPService.
+The match is on the receiving TCPIPService, not on the port in the request's Host header.
+Requests for /replicate or /deplicate sent to the http or https data ports do not match these URIMAPs and are not
+routed to ZFAM001. Because the replication port does not authenticate, restrict access to it at the network layer so
+only the opposing environment can connect. Verify with CEMT INQUIRE URIMAP(FA##R) and CEMT INQUIRE URIMAP(FA##D) that
+the TCPIPService is ZFAMREPL. Install ZFAMREPL in every region that installs the FA## group and receives replication.
+
 To enable replication for an instance of ZFAM, edit FA##DC in the JCL library and modify the SYSUT1 DD. The valid values
 for type are AA, AS and A1. AA is for active-active replication. AS is for active-standby and A1 is stand alone. The
-second line is the host name and port of the opposing environment. The primary environment will need to have the
+second line is the host name and replication port (@rep_port@) of the opposing environment, using the http scheme.
+The primary environment will need to have the
 alternate's host name and port defined. And the alternate environment with to have the primary's host name and port
 defined. Change all occurrences of ## to the value used for @id@ when defining the instance. The job will create a
 document template member and define it to the instance group. Submit the job. Upon successful completion,
