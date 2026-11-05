@@ -341,6 +341,25 @@ SY_0022  DS   0H
          SR    R4,R6                   Subtract PA entry length
          BC    B'0011',SY_0020         Continue PA scan
 ***********************************************************************
+* Reject the request when any zQL field data exceeds the FAxxFD       *
+* defined field length.  This is done before any I/O is issued, so    *
+* the segment record buffer and FAxxKEY key area are never overrun.   *
+***********************************************************************
+SY_0024  DS   0H
+         L     R4,PA_LEN               Load parser array length
+         L     R5,PA_ADDR              Load parser array address
+         LA    R6,E_PA                 Load parser array entry length
+SY_0025  DS   0H
+         MVC   C_NAME,P_NAME           Move container name
+         BAS   R14,GC_0010             Issue GET CONTAINER for field
+         ZAP   W_LENGTH,P_LEN          Move field length to work area
+         CVB   R1,W_LENGTH             Convert to binary
+         C     R1,C_LENGTH             Field data exceed field length?
+         BC    B'0100',ER_40002        ... yes, STATUS(400)
+         LA    R5,0(R6,R5)             Point to next PA entry
+         SR    R4,R6                   Subtract PA entry length
+         BC    B'0011',SY_0025         Continue PA scan
+***********************************************************************
 * Prepare to scan parser array for Primary Key.                       *
 ***********************************************************************
 SY_0028  DS   0H
@@ -565,6 +584,11 @@ SY_0185  DS   0H
          BAS   R14,GC_0010             Issue GET CONTAINER for field
          ST    R1,FD_ADDR              Save field data address
          MVC   FD_LEN,C_LENGTH         Move field data length
+*
+         ZAP   W_LENGTH,P_LEN          Move field length to work area
+         CVB   R1,W_LENGTH             Convert to binary
+         C     R1,FD_LEN               Field data exceed field length?
+         BC    B'0100',ER_40002        ... yes, STATUS(400)
 *
          CP    W_ID,PD_ONE             Secondary Column Index?
          BC    B'1100',SY_0188         ... no,  continue process
@@ -1168,6 +1192,13 @@ ER_20405 DS   0H
 ER_40001 DS   0H
          MVC   C_STATUS,S_400          Set STATUS
          MVC   C_REASON,=C'01'         Set REASON
+         BC    B'1111',PC_0010         Transfer control to logging
+***********************************************************************
+* STATUS(400)                                                         *
+***********************************************************************
+ER_40002 DS   0H
+         MVC   C_STATUS,S_400          Set STATUS
+         MVC   C_REASON,=C'02'         Set REASON
          BC    B'1111',PC_0010         Transfer control to logging
 *
 ***********************************************************************
