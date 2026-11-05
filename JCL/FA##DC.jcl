@@ -5,7 +5,8 @@
 //* To use this job repeatedly
 //* Change ## to the @id@ value in DEFFA##, example: C ## 01 ALL
 //* Customize replication parameters
-//* Note: the scheme used below must match @scheme@ in DEFFA##
+//* Note: the URL must use @rep_port@ and the scheme of the ZFAMREPL
+//*       TCPIPSERVICE (http, or https when ZFAMREPL is SSL(YES))
 //* Submit
 //* Enter CANCEL on the command line to cancel changes and exit edit
 //**********************************************************************
