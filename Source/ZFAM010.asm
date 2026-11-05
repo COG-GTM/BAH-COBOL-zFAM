@@ -1322,6 +1322,8 @@ PK_0010  DS   0H
 ***********************************************************************
 PK_0800  DS   0H
          L     R14,PK_LEN              INSERT provided key (length)
+         LTR   R14,R14                 INSERT key data present?
+         BC    B'1100',ER_40008        ... no,  HTTP status 400-08
          A     R14,=F'32'              Add zUID length
 *
          PACK  W_LENGTH,PI_LEN         Pack Key length from FAxxFD
@@ -1379,6 +1381,8 @@ PK_0900  DS   0H
 PK_1000  DS   0H
 *
          L     R14,PK_LEN              INSERT provided key (length)
+         LTR   R14,R14                 INSERT key data present?
+         BC    B'1100',ER_40008        ... no,  HTTP status 400-08
 *
          PACK  W_LENGTH,PI_LEN         Pack Key length from FAxxFD
          CVB   R15,W_LENGTH            Convert to binary
@@ -1533,6 +1537,13 @@ ER_40006 DS   0H
 ER_40007 DS   0H
          MVC   C_STATUS,S_400          Set STATUS
          MVC   C_REASON,=C'07'         Set REASON
+         BC    B'1111',PC_0010         Transfer control to logging
+***********************************************************************
+* STATUS(400)                                                         *
+***********************************************************************
+ER_40008 DS   0H
+         MVC   C_STATUS,S_400          Set STATUS
+         MVC   C_REASON,=C'08'         Set REASON
          BC    B'1111',PC_0010         Transfer control to logging
 ***********************************************************************
 * STATUS(409)                                                         *

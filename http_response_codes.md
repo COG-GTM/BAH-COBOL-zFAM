@@ -17,11 +17,15 @@
 - 400 01-002 WEB RECEIVE error
 - 400 01-010 Primary Key is not provided and zFAM-UID header is not present.
 - 400 01-020 Primary key not present in WHERE statement on SELECT command.
+- 400 01-022 WHERE value on SELECT is empty or exceeds the FAxxFD field length.
 - 400 01-030 Primary key not provided on zQL UPDATE (PUT).
 - 400 01-040 Primary key not provided on zQL DELETE.
 - 400 02-001 Invalid HTTP method detected during Basic Mode FAxxFD process
 - 400 02-002 Invalid URI format. Must have seven slashes.
 - 400 02-010 Primary Key and zFAM-UID are present, but zFAM-Concat is omitted.
+- 400 02-020 Primary key value on SELECT is empty or exceeds FAxxFD defined key length.
+- 400 02-030 Primary key value on UPDATE is empty or exceeds FAxxFD defined key length.
+- 400 02-040 Primary key value on DELETE is empty or exceeds FAxxFD defined key length.
 - 400 03-002 URI Key exceeds 255 byte maximum
 - 400 03-010 Primary Key and zFAM-Concat are present, but zFAM-UID is omitted.
 - 400 04-001 Invalid HTTP method detected during Query Mode process.
@@ -38,7 +42,8 @@
 - 400 07-010 zUID exceeds FAxxFD defined key length
 - 400 08-001 Query Mode syntax error while parsing UPDATE command.
 - 400 08-002 DEFINE Named Counter for Modulo failed.
-- 400 09-001 Query Mode syntax error while parsing DELETE command.
+- 400 08-010 Primary key provided on INSERT is empty.
+- 400 09-001 Query Mode syntax error while parsing DELETE command (includes an empty primary key value or one longer than the FAxxFD key length).
 - 400 09-002 zFAM task abended during I/O processing
 - 400 10-001 Invalid query string on POST/PUT request DFHCOMMAREA parser.
 - 400 10-002 zFAM-RangeBegin or zFAM-RangeEnd specified for DELETE request.

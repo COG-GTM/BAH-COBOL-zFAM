@@ -2548,6 +2548,12 @@ QM_0440  DS   0H
          S     R4,=F'1'                Adjust remaining length
          BC    B'1100',ER_40009        Syntax error when EOQS
 *
+         LTR   R1,R1                   Primary key data present?
+         BC    B'1000',ER_40009        ... no,  syntax error
+         ZAP   W_PACK,P_LEN            Move key field length
+         CVB   R15,W_PACK              Convert to binary
+         CR    R1,R15                  Data exceeds key field length?
+         BC    B'0010',ER_40009        ... yes, syntax error
          ST    R1,W_LENGTH             Save data length
          BAS   R14,PC_0010             Issue PUT CONTAINER
 *

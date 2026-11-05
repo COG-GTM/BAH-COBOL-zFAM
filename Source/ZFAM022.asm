@@ -525,6 +525,11 @@ SY_0040  DS   0H
          BAS   R14,GC_0010             Issue GET CONTAINER
          ST    R9,FD_ADDR              Save field data address
          MVC   FD_LEN,C_LENGTH         Move field data length
+         L     R1,FD_LEN               Load CI data length
+         LTR   R1,R1                   WHERE data present?
+         BC    B'1100',ER_40001        ... no,  STATUS(400)
+         C     R1,MAX_CI               WHERE data exceeds CA_DATA?
+         BC    B'0010',ER_40001        ... yes, STATUS(400)
 *
          L     R7,CA_PTR               Load CI Array pointer
          USING CA_DSECT,R7             ... tell assembler
@@ -602,6 +607,7 @@ SY_0045  DS   0H
          CVB   R13,W_PDWA              Convert field length to binary
          L     R1,FD_LEN               Load field data length
          SR    R13,R1                  Subtract from maximum
+         BC    B'0100',ER_40001        Data exceeds field, STATUS(400)
 *
          S     R1,=F'1'                Subtract one for EX MVC
          LA    R14,CA_DATA             Load target addres
@@ -2156,6 +2162,13 @@ ER_20408 DS   0H
          MVC   C_STATUS,S_204          Set STATUS
          MVC   C_REASON,=C'08'         Set REASON
          MVC   C_FILE,EIBDS            Set FCT name
+         BC    B'1111',PC_0010         Transfer control to logging
+***********************************************************************
+* STATUS(400)                                                         *
+***********************************************************************
+ER_40001 DS   0H
+         MVC   C_STATUS,S_400          Set STATUS
+         MVC   C_REASON,=C'01'         Set REASON
          BC    B'1111',PC_0010         Transfer control to logging
 ***********************************************************************
 * STATUS(412)                                                         *
