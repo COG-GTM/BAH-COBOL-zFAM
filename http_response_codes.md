@@ -54,6 +54,9 @@
 - 401 12-001 HTTP/PUT, POST, DELETE not allowed in Query Mode
 - 401 13-001 HTTPS Query Mode.  UserID not found in FAxxSD security table
 - 401 14-001 HTTPS Query Mode.  UserID not authorized for requested field
+- 401 15-001 HTTP/GET with zFAM-Lock rejected.  Row lock requires HTTPS WRITE
+- 401 16-001 HTTPS Basic Mode GET+Lock. UserID not allowed WRITE access
+- 401 17-001 Replicate GET with zFAM-Lock not allowed
 - 403 01-001 Query Mode request failed due to FAxxFD table not defined.
 - 405 01-001 Invalid Query Mode command on xxxxxx method. Must be an xxxxxx.
 - 409 01-002 xxxxxxxx GET row-level lock failed.  Record already locked
