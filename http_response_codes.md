@@ -66,7 +66,10 @@
 - 412 01-010 xxxxxxxxxxxxxxxx field defined with invalid field type.
 - 413 01-001 Maximum RECEIVE length exceeded during PUT/POST process.
 - 413 01-002 WEB RECEIVE length exceeded 3.2MB limit
+- 413 01-030 xxxxxxxx zQL UPDATE field data exceeds FAxxFD defined field length.
+- 413 02-001 zQL UPDATE field data exceeds FAxxFD defined field length.
 - 413 02-002 LOB Append exceeds the 2GB limit
+- 413 02-030 zQL UPDATE field extends beyond the FAxxFILE record segment.
 - 414 01-001 Query string maximum length exceeded.
 - 414 02-001 Path maximum length exceeded.
 - 414 03-001 Maximum fields (256) exceeded during xxxxxx (xxxxxx) process.

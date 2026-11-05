@@ -73,6 +73,7 @@ X_NAME   DS    CL16               Field Name   (during search)
 W_NAME   DS    CL16               Field Name   (container name)
 W_LENGTH DS    F                  Field Length (container data)
 W_INDEX  DS    F                  Parser array index
+W_F_LEN  DS    F                  FAxxFD field length (binary)
          DS   0F
 W_FIELDS DS    CL01               Command indicator
 W_WHERE  DS    CL01               Command indicator
@@ -2219,6 +2220,9 @@ QM_0335  DS    0H
          PACK  P_ID,F_ID               Pack field ID       to PA
          PACK  P_COL,F_COL             Pack field column   to PA
          PACK  P_LEN,F_LEN             Pack field length   to PA
+         ZAP   W_PACK,P_LEN            Move field length to work area
+         CVB   R1,W_PACK               Convert to binary
+         ST    R1,W_F_LEN              Save FAxxFD field length
 *
          XR    R1,R1                   Clear R1
          ST    R5,W_ADDR               Save field data address
@@ -2235,6 +2239,8 @@ QM_0336  DS   0H
          LA    R1,1(,R1)               Increment field length
          C     R1,MAX_LEN              Field length exceed maximum?
          BC    B'1000',ER_40008        ... yes, syntax error
+         C     R1,W_F_LEN              Field length exceed FAxxFD?
+         BC    B'0010',ER_41302        ... yes, STATUS(413)
          BCT   R4,QM_0336              Continue parsing
          BC    B'1111',ER_40008        Syntax error when zero
 ***********************************************************************
@@ -2369,6 +2375,9 @@ QM_0345  DS    0H
          PACK  P_ID,F_ID               Pack field ID       to PA
          PACK  P_COL,F_COL             Pack field column   to PA
          PACK  P_LEN,F_LEN             Pack field length   to PA
+         ZAP   W_PACK,P_LEN            Move field length to work area
+         CVB   R1,W_PACK               Convert to binary
+         ST    R1,W_F_LEN              Save FAxxFD field length
 *
          XR    R1,R1                   Clear R1
          ST    R5,W_ADDR               Save field data address
@@ -2385,7 +2394,9 @@ QM_0346  DS    0H
          LA    R1,1(,R1)               Increment field length
          C     R1,MAX_LEN              Field length exceed maximum?
          BC    B'1000',ER_40008        ... yes, syntax error
-         BCT   R4,QM_0336              Continue parsing
+         C     R1,W_F_LEN              Field length exceed FAxxFD?
+         BC    B'0010',ER_41302        ... yes, STATUS(413)
+         BCT   R4,QM_0346              Continue parsing
          BC    B'1111',ER_40008        Syntax error when zero
 ***********************************************************************
 * Issue PUT CONTAINER for this data field                             *
@@ -3237,6 +3248,13 @@ ER_41203 DS   0H
 ER_41301 DS   0H
          MVC   C_STATUS,S_413          Set STATUS
          MVC   C_REASON,=C'01'         Set REASON
+         BC    B'1111',ER_XCTL         Transfer control to logging
+***********************************************************************
+* STATUS(413) RETURN CODE(02)                                         *
+***********************************************************************
+ER_41302 DS   0H
+         MVC   C_STATUS,S_413          Set STATUS
+         MVC   C_REASON,=C'02'         Set REASON
          BC    B'1111',ER_XCTL         Transfer control to logging
 ***********************************************************************
 * STATUS(414) RETURN CODE(01)                                         *
