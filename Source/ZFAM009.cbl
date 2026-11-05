@@ -66,6 +66,7 @@
        01  LOGICAL-LENGTH         PIC S9(08) COMP VALUE ZEROES.
        01  AVAILABLE-LENGTH       PIC S9(08) COMP VALUE ZEROES.
        01  MESSAGE-LENGTH         PIC S9(08) COMP VALUE ZEROES.
+       01  ENTRY-LENGTH           PIC S9(08) COMP VALUE ZEROES.
        01  STATUS-LENGTH          PIC S9(08) COMP VALUE 255.
        01  TRAILING-NULLS         PIC S9(08) COMP VALUE 0.
        01  ROWS-COUNT             PIC S9(08) COMP VALUE 0.
@@ -108,6 +109,7 @@
        01  APPLICATION-JSON       PIC  X(56) VALUE 'application/json'.
 
        01  PROCESS-COMPLETE       PIC  X(01) VALUE SPACES.
+       01  BUFFER-FULL            PIC  X(01) VALUE 'N'.
 
        01  GET-COUNT              PIC  9(03) VALUE ZEROES.
 
@@ -225,6 +227,13 @@
       *****************************************************************
        1000-INITIALIZE.
            MOVE 'N'                         TO PROCESS-COMPLETE.
+
+           IF  GET-CA-ROWS NOT NUMERIC
+               MOVE 1                       TO GET-CA-ROWS.
+
+           IF  GET-CA-ROWS EQUAL ZEROES
+               MOVE 1                       TO GET-CA-ROWS.
+
            MOVE EIBTRNID(3:2)               TO FK-TRANID(3:2).
            MOVE EIBTRNID(3:2)               TO FF-TRANID(3:2).
 
@@ -393,6 +402,46 @@
            SUBTRACT TRAILING-NULLS FROM LENGTH OF FK-KEY
                GIVING KEY-LENGTH.
 
+           PERFORM 3310-CHECK-LENGTH   THRU 3310-EXIT.
+
+           IF  BUFFER-FULL EQUAL 'N'
+               PERFORM 3320-APPEND-KEY THRU 3320-EXIT.
+
+       3300-EXIT.
+           EXIT.
+
+      *****************************************************************
+      * Compare the next key entry length with the remaining buffer   *
+      * length.                                                       *
+      * When there's not enough buffer area to hold the next key,     *
+      * set the BUFFER-FULL condition and return HTTP status code 206 *
+      * with the keys collected so far.                               *
+      *****************************************************************
+       3310-CHECK-LENGTH.
+           MOVE KEY-LENGTH               TO ENTRY-LENGTH.
+
+           IF  GET-CA-DELIM EQUAL LOW-VALUES OR SPACES
+               ADD 3 TO ENTRY-LENGTH.
+
+           IF  GET-CA-DELIM NOT EQUAL LOW-VALUES
+           AND GET-CA-DELIM NOT EQUAL SPACES
+           AND MESSAGE-COUNT NOT EQUAL ZEROES
+               ADD 1 TO ENTRY-LENGTH.
+
+           SUBTRACT MESSAGE-LENGTH FROM GETMAIN-LENGTH
+               GIVING AVAILABLE-LENGTH.
+
+           IF  ENTRY-LENGTH GREATER THAN AVAILABLE-LENGTH
+               MOVE 'Y' TO BUFFER-FULL
+               MOVE 'Y' TO PROCESS-COMPLETE.
+
+       3310-EXIT.
+           EXIT.
+
+      *****************************************************************
+      * Append the current key to the KEYSONLY list.                  *
+      *****************************************************************
+       3320-APPEND-KEY.
            IF  GET-CA-DELIM EQUAL LOW-VALUES OR SPACES
                MOVE KEY-LENGTH           TO ZFAM-MESSAGE(1:3)
                ADD 3 TO MESSAGE-LENGTH
@@ -420,7 +469,7 @@
 
            SET ADDRESS OF ZFAM-MESSAGE   TO START-ADDRESS.
 
-       3300-EXIT.
+       3320-EXIT.
            EXIT.
 
       *****************************************************************
@@ -452,6 +501,10 @@
 
            IF  RANGE-RESPONSE EQUAL DFHRESP(NORMAL)
                MOVE PREVIOUS-KEY            TO LAST-KEY.
+
+           IF  BUFFER-FULL EQUAL 'Y'
+               MOVE PREVIOUS-KEY            TO LAST-KEY
+               MOVE HTTP-STATUS-206         TO HTTP-STATUS.
 
            MOVE ZEROES TO TRAILING-NULLS.
            INSPECT FUNCTION REVERSE(LAST-KEY)

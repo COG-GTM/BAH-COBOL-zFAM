@@ -217,6 +217,13 @@
       *****************************************************************
        1000-INITIALIZE.
            MOVE 'N'                          TO PROCESS-COMPLETE.
+
+           IF  GET-CA-ROWS NOT NUMERIC
+               MOVE 1                       TO GET-CA-ROWS.
+
+           IF  GET-CA-ROWS EQUAL ZEROES
+               MOVE 1                       TO GET-CA-ROWS.
+
            MOVE EIBTRNID(3:2)                TO FK-TRANID(3:2).
            MOVE EIBTRNID(3:2)                TO FF-TRANID(3:2).
 
