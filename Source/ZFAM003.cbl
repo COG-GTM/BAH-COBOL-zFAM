@@ -178,6 +178,7 @@
 
        01  RESOURCES              PIC  X(10) VALUE '/resources'.
        01  REPLICATE              PIC  X(10) VALUE '/replicate'.
+       01  DATASTORE              PIC  X(10) VALUE '/datastore'.
 
        01  HTTP-STATUS            PIC S9(04) COMP.
        01  HTTP-TEXT-LENGTH       PIC S9(08) COMP.
@@ -334,13 +335,14 @@
 
       *****************************************************************
       * Replicate request to the partner Data Center.                 *
-      * If this is a replicate request, set document type to null,    *
-      * as this IS the partner Data Center.                           *
+      * Only requests received on /datastore are replicated.          *
+      * For any other path (e.g. /replicate), set document type to    *
+      * null, as this IS the partner Data Center.                     *
       *****************************************************************
        2000-REPLICATE.
            PERFORM 7000-GET-URL               THRU 7000-EXIT.
 
-           IF  CA-URI-FIELD-01 EQUAL REPLICATE
+           IF  CA-URI-FIELD-01 NOT EQUAL DATASTORE
                MOVE LOW-VALUES TO    DC-TYPE.
 
            IF  EIBRESP EQUAL DFHRESP(NORMAL)
