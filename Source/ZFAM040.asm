@@ -397,6 +397,23 @@ SY_0060  DS   0H
          ST    R1,FD_ADDR              Save field data address
          MVC   FD_LEN,C_LENGTH         Move field data length
 ***********************************************************************
+* Reject primary key data that is empty or longer than the FAxxFD     *
+* key length before it is moved into WK_KEY.                          *
+***********************************************************************
+SY_0065  DS   0H
+         CLC   C_RESP,=F'0'            Primary key container found?
+         BC    B'0111',ER_40002        ... no,  STATUS(400)
+         L     R1,FD_LEN               Load field data length
+         LTR   R1,R1                   Primary key data present?
+         BC    B'1100',ER_40002        ... no,  STATUS(400)
+         ZAP   W_LENGTH,PI_LEN         Move PA length to work area
+         CVB   R15,W_LENGTH            Convert to binary
+         CR    R1,R15                  Data exceeds FAxxFD key length?
+         BC    B'0010',ER_40002        ... yes, STATUS(400)
+         LA    R15,L'WK_KEY            Load key buffer length
+         CR    R1,R15                  Data exceeds key buffer?
+         BC    B'0010',ER_40002        ... yes, STATUS(400)
+***********************************************************************
 * Determine Primary Index field type and branch accordingly.          *
 ***********************************************************************
 SY_0070  DS   0H
@@ -1082,6 +1099,13 @@ ER_20405 DS   0H
 ER_40001 DS   0H
          MVC   C_STATUS,S_400          Set STATUS
          MVC   C_REASON,=C'01'         Set REASON
+         BC    B'1111',PC_0010         Transfer control to logging
+***********************************************************************
+* STATUS(400)                                                         *
+***********************************************************************
+ER_40002 DS   0H
+         MVC   C_STATUS,S_400          Set STATUS
+         MVC   C_REASON,=C'02'         Set REASON
          BC    B'1111',PC_0010         Transfer control to logging
 *
 ***********************************************************************
