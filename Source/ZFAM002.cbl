@@ -1196,11 +1196,11 @@
            MOVE '1420'          TO T_46_M.
            PERFORM 9995-TRACE THRU 9995-EXIT.
 
-           IF  ROWS-COUNT NUMERIC
-               MOVE ROWS-COUNT TO GET-CA-ROWS.
+           MOVE 1              TO GET-CA-ROWS.
 
-           IF  ROWS-COUNT NOT NUMERIC
-               MOVE 1          TO GET-CA-ROWS.
+           IF  ROWS-COUNT NUMERIC
+               IF  ROWS-COUNT GREATER THAN ZEROES
+                   MOVE ROWS-COUNT TO GET-CA-ROWS.
 
            MOVE 'Y'            TO ROWS-REQUEST.
 
