@@ -2793,8 +2793,12 @@
 
       *****************************************************************
       * Check zFAM-RangeBegin and zFAM-RangeEnd for correct range.    *
+      * Pass the path prefix to zFAM003, so that range deletes        *
+      * received on /replicate are not replicated again.              *
       *****************************************************************
        5020-RANGE.
+           MOVE WEB-PATH(1:10)               TO CA-URI-FIELD-01.
+
            IF  BEGIN-VALUE LESS THAN END-VALUE
            OR  BEGIN-VALUE EQUAL     END-VALUE
                EXEC CICS XCTL PROGRAM(ZFAM003)
