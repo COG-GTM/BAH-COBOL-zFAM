@@ -64,10 +64,13 @@
        01  ZFAM-FAXXFD            PIC  X(16) VALUE 'ZFAM-FAXXFD   '.
        01  ZFAM-NEW-REC           PIC  X(16) VALUE 'ZFAM-NEW-REC  '.
        01  ZFAM-NEW-KEY           PIC  X(16) VALUE 'ZFAM-NEW-KEY  '.
+       01  ZFAM-NEW-LEN           PIC  X(16) VALUE 'ZFAM-NEW-LEN  '.
        01  ZFAM-OLD-KEY           PIC  X(16) VALUE 'ZFAM-OLD-KEY  '.
 
        01  POINTER-LENGTH         PIC S9(08) COMP VALUE ZEROES.
        01  KEY-LENGTH             PIC S9(08) COMP VALUE ZEROES.
+       01  RECORD-LENGTH          PIC S9(08) COMP VALUE ZEROES.
+       01  RECLEN-LENGTH          PIC S9(08) COMP VALUE ZEROES.
 
       *****************************************************************
       * Message resources                                             *
@@ -116,6 +119,7 @@
        01  FD-ENTRY-LENGTH        PIC S9(08) COMP VALUE ZEROES.
        01  LEN                    PIC S9(08) COMP VALUE ZEROES.
        01  COL                    PIC S9(08) COMP VALUE ZEROES.
+       01  FIELD-END              PIC S9(08) COMP VALUE ZEROES.
 
       *****************************************************************
       * Dynamic Storage                                               *
@@ -216,6 +220,23 @@
                 NOHANDLE
            END-EXEC.
 
+      *****************************************************************
+      * Length of the record received by ZFAM002.  Without it, CI     *
+      * fields cannot be bounded, so no CI records are written.       *
+      *****************************************************************
+           MOVE LENGTH OF RECORD-LENGTH      TO RECLEN-LENGTH.
+
+           EXEC CICS GET
+                CONTAINER(ZFAM-NEW-LEN)
+                CHANNEL  (ZFAM-CHANNEL)
+                INTO     (RECORD-LENGTH)
+                FLENGTH  (RECLEN-LENGTH)
+                NOHANDLE
+           END-EXEC.
+
+           IF  EIBRESP NOT EQUAL DFHRESP(NORMAL)
+               MOVE ZEROES                   TO RECORD-LENGTH.
+
        2000-EXIT.
            EXIT.
 
@@ -256,6 +277,18 @@
            MOVE LOW-VALUES                   TO CI-KEY.
            MOVE FD-COLUMN                    TO COL.
            MOVE FD-LENGTH                    TO LEN.
+           COMPUTE FIELD-END = COL + LEN - 1.
+
+      *****************************************************************
+      * Skip fields that are not entirely within the received record  *
+      * or that do not fit in CI-FIELD.                               *
+      *****************************************************************
+           IF  COL       LESS    THAN ONE
+           OR  LEN       LESS    THAN ONE
+           OR  LEN       GREATER THAN LENGTH OF CI-FIELD
+           OR  FIELD-END GREATER THAN RECORD-LENGTH
+               GO TO 3200-EXIT.
+
            MOVE ZFAM-DATA(COL:LEN)           TO CI-FIELD(1:LEN).
            MOVE NEW-KEY                      TO CI-I-KEY.
 
