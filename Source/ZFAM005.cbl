@@ -63,12 +63,26 @@
        01  HTTP-STATUS-400        PIC S9(04) COMP VALUE 400.
        01  HTTP-STATUS-401        PIC S9(04) COMP VALUE 401.
        01  HTTP-STATUS-503        PIC S9(04) COMP VALUE 503.
+       01  HTTP-STATUS-507        PIC S9(04) COMP VALUE 507.
 
        01  HTTP-204-TEXT          PIC  X(24) VALUE SPACES.
        01  HTTP-204-LENGTH        PIC S9(08) COMP VALUE ZEROES.
 
        01  HTTP-503-TEXT          PIC  X(24) VALUE SPACES.
        01  HTTP-503-LENGTH        PIC S9(08) COMP VALUE ZEROES.
+
+       01  HTTP-507-LENGTH        PIC S9(08) COMP VALUE 64.
+       01  HTTP-507-TEXT.
+           02  FILLER             PIC  X(11) VALUE '507 01-005 '.
+           02  HTTP-507-FILE      PIC  X(08) VALUE SPACES.
+           02  FILLER             PIC  X(16) VALUE ' Error accessing'.
+           02  FILLER             PIC  X(16) VALUE ' zFAM table.    '.
+           02  FILLER             PIC  X(16) VALUE '                '.
+
+       01  HEADER-ECR             PIC  X(08) VALUE 'zFAM-ECR'.
+       01  HEADER-ECR-LENGTH      PIC S9(08) COMP VALUE  8.
+       01  HEADER-ECR-VALUE       PIC  X(03) VALUE 'Yes'.
+       01  HEADER-ECR-VALUE-LEN   PIC S9(08) COMP VALUE  3.
 
        01  HTTP-OK                PIC  X(02) VALUE 'OK'.
        01  HTTP-NOT-FOUND         PIC  X(16) VALUE 'Record not found'.
@@ -83,6 +97,7 @@
 
        01  PROCESS-COMPLETE       PIC  X(01) VALUE SPACES.
        01  FF-SUCCESSFUL          PIC  X(01) VALUE SPACES.
+       01  INTERNAL-KEY           PIC  X(08) VALUE LOW-VALUES.
 
        01  GET-COUNT              PIC  9(03) VALUE ZEROES.
 
@@ -115,6 +130,28 @@
            02  TD-TRANID          PIC  X(04).
            02  FILLER             PIC  X(01) VALUE SPACES.
            02  TD-MESSAGE         PIC  X(90) VALUE SPACES.
+
+       01  50702-MESSAGE.
+           02  FILLER             PIC  X(16) VALUE 'GET/READ primary'.
+           02  FILLER             PIC  X(16) VALUE ' key references '.
+           02  FILLER             PIC  X(16) VALUE 'an internal key '.
+           02  FILLER             PIC  X(16) VALUE 'on *FILE that do'.
+           02  FILLER             PIC  X(16) VALUE 'es not exist:   '.
+           02  FILLER             PIC  X(02) VALUE SPACES.
+           02  50702-KEY          PIC  X(08) VALUE 'xxxxxxxx'.
+
+       01  FCT-ERROR.
+           02  FILLER             PIC  X(13) VALUE 'File Error   '.
+           02  FE-DS              PIC  X(08) VALUE SPACES.
+           02  FILLER             PIC  X(01) VALUE SPACES.
+           02  FILLER             PIC  X(07) VALUE 'EIBFN: '.
+           02  FE-FN              PIC  X(07) VALUE SPACES.
+           02  FILLER             PIC  X(10) VALUE ' EIBRESP: '.
+           02  FE-RESP            PIC  9(08) VALUE ZEROES.
+           02  FILLER             PIC  X(11) VALUE ' EIBRESP2: '.
+           02  FE-RESP2           PIC  9(08) VALUE ZEROES.
+           02  FILLER             PIC  X(12) VALUE ' Paragraph: '.
+           02  FE-PARAGRAPH       PIC  X(04) VALUE SPACES.
 
        01  FK-FCT.
            02  FK-TRANID          PIC  X(04) VALUE 'FA##'.
@@ -286,13 +323,75 @@
       *                                                               *
       * Read the FILE/DATA store, which contains the zFAM record      *
       * segments.                                                     *
+      *                                                               *
+      * An event control record (ECR) has no FILE/DATA store record.  *
+      *                                                               *
+      * When a FILE/DATA store read fails, the KEY store record is    *
+      * read again before retrying, as an UPDATE (PUT) may have       *
+      * swapped the internal key.                                     *
       *****************************************************************
        3100-READ-PROCESS.
+           IF  PROCESS-COMPLETE EQUAL 'N'
+               PERFORM 3200-READ-KEY       THRU 3200-EXIT.
+
            MOVE 'Y'                          TO PROCESS-COMPLETE.
+
+           IF  FK-ECR EQUAL 'Y'
+               PERFORM 3600-SEND-ECR       THRU 3600-EXIT
+               PERFORM 9000-RETURN         THRU 9000-EXIT.
+
            PERFORM 3300-READ-FILE          THRU 3300-EXIT.
            IF  FF-SUCCESSFUL EQUAL 'Y'
                PERFORM 3400-STAGE          THRU 3400-EXIT.
+
+           IF  PROCESS-COMPLETE EQUAL 'N'
+               MOVE FK-FF-KEY                TO INTERNAL-KEY.
        3100-EXIT.
+           EXIT.
+
+      *****************************************************************
+      * Read the KEY store record again after a FILE/DATA store miss. *
+      * When the internal key has not changed, the FILE/DATA store    *
+      * record does not exist, so end the request with a 507 instead  *
+      * of retrying the same read.                                    *
+      *****************************************************************
+       3200-READ-KEY.
+           MOVE LENGTH OF FK-RECORD         TO FK-LENGTH.
+
+           EXEC CICS READ FILE(FK-FCT)
+                INTO(FK-RECORD)
+                RIDFLD(FK-KEY)
+                LENGTH(FK-LENGTH)
+                NOHANDLE
+           END-EXEC.
+
+           IF  EIBRESP EQUAL DFHRESP(NOTFND)
+               MOVE ZEROES                  TO STATUS-LENGTH
+               MOVE ZEROES                  TO MESSAGE-COUNT
+               PERFORM 9600-HEADER        THRU 9600-EXIT
+               MOVE HTTP-NOT-FOUND          TO HTTP-204-TEXT
+               MOVE HTTP-NOT-FOUND-LENGTH   TO HTTP-204-LENGTH
+               PERFORM 9700-STATUS-204    THRU 9700-EXIT
+               PERFORM 9000-RETURN        THRU 9000-EXIT.
+
+           IF  EIBRESP NOT EQUAL DFHRESP(NORMAL)
+               MOVE EIBDS                   TO HTTP-507-FILE
+               MOVE FC-READ                 TO FE-FN
+               MOVE '3200'                  TO FE-PARAGRAPH
+               PERFORM 9997-FCT-ERROR     THRU 9997-EXIT
+               PERFORM 9810-STATUS-507    THRU 9810-EXIT
+               PERFORM 9000-RETURN        THRU 9000-EXIT.
+
+           IF  FK-ECR    NOT EQUAL 'Y'
+           AND FK-FF-KEY     EQUAL INTERNAL-KEY
+               MOVE FK-FF-KEY               TO 50702-KEY
+               MOVE 50702-MESSAGE           TO TD-MESSAGE
+               PERFORM 9900-WRITE-CSSL    THRU 9900-EXIT
+               MOVE FF-FCT                  TO HTTP-507-FILE
+               PERFORM 9810-STATUS-507    THRU 9810-EXIT
+               PERFORM 9000-RETURN        THRU 9000-EXIT.
+
+       3200-EXIT.
            EXIT.
 
 
@@ -410,6 +509,46 @@
            EXIT.
 
       *****************************************************************
+      * Send an event control record (ECR), which is a key only.      *
+      *****************************************************************
+       3600-SEND-ECR.
+           MOVE ZEROES                       TO TRAILING-NULLS.
+
+           INSPECT FUNCTION REVERSE(FK-KEY)
+           TALLYING TRAILING-NULLS
+           FOR LEADING LOW-VALUES.
+
+           SUBTRACT TRAILING-NULLS FROM LENGTH OF FK-KEY
+               GIVING STATUS-LENGTH.
+
+           PERFORM 9600-HEADER THRU 9600-EXIT.
+
+           EXEC CICS WEB WRITE
+                HTTPHEADER (HEADER-ECR)
+                NAMELENGTH (HEADER-ECR-LENGTH)
+                VALUE      (HEADER-ECR-VALUE)
+                VALUELENGTH(HEADER-ECR-VALUE-LEN)
+                NOHANDLE
+           END-EXEC.
+
+           MOVE DFHVALUE(IMMEDIATE)          TO SEND-ACTION.
+
+           EXEC CICS WEB SEND
+                FROM      (FK-KEY)
+                FROMLENGTH(STATUS-LENGTH)
+                MEDIATYPE (TEXT-PLAIN)
+                STATUSCODE(HTTP-STATUS-200)
+                STATUSTEXT(FK-KEY)
+                STATUSLEN (STATUS-LENGTH)
+                ACTION    (SEND-ACTION)
+                SRVCONVERT
+                NOHANDLE
+           END-EXEC.
+
+       3600-EXIT.
+           EXIT.
+
+      *****************************************************************
       * Send zFAM   record.                                           *
       *****************************************************************
        4000-SEND-RESPONSE.
@@ -522,6 +661,27 @@
            EXIT.
 
       *****************************************************************
+      * Status 507 response.                                          *
+      *****************************************************************
+       9810-STATUS-507.
+           MOVE DFHVALUE(IMMEDIATE)     TO SEND-ACTION.
+
+           EXEC CICS WEB SEND
+                FROM      (HTTP-507-TEXT)
+                FROMLENGTH(HTTP-507-LENGTH)
+                MEDIATYPE (TEXT-PLAIN)
+                STATUSCODE(HTTP-STATUS-507)
+                STATUSTEXT(HTTP-507-TEXT)
+                STATUSLEN (HTTP-507-LENGTH)
+                ACTION    (SEND-ACTION)
+                SRVCONVERT
+                NOHANDLE
+           END-EXEC.
+
+       9810-EXIT.
+           EXIT.
+
+      *****************************************************************
       * Write TD CSSL.                                                *
       *****************************************************************
        9900-WRITE-CSSL.
@@ -553,5 +713,18 @@
            END-EXEC.
 
        9950-EXIT.
+           EXIT.
+
+      *****************************************************************
+      * File Control Table (FCT) error                                *
+      *****************************************************************
+       9997-FCT-ERROR.
+           MOVE EIBDS                 TO FE-DS.
+           MOVE EIBRESP               TO FE-RESP.
+           MOVE EIBRESP2              TO FE-RESP2.
+           MOVE FCT-ERROR             TO TD-MESSAGE.
+           PERFORM 9900-WRITE-CSSL  THRU 9900-EXIT.
+
+       9997-EXIT.
            EXIT.
 

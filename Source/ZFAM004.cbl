@@ -62,6 +62,7 @@
        01  GETMAIN-LENGTH         PIC S9(08) COMP VALUE ZEROES.
        01  STATUS-LENGTH          PIC S9(08) COMP VALUE 255.
        01  TRAILING-NULLS         PIC S9(08) COMP VALUE 0.
+       01  NEXT-KEY-NULLS         PIC S9(08) COMP VALUE 0.
 
        01  TWO-FIFTY-FIVE         PIC S9(08) COMP VALUE 255.
        01  ONE                    PIC S9(08) COMP VALUE  1.
@@ -94,6 +95,7 @@
 
        01  PROCESS-COMPLETE       PIC  X(01) VALUE SPACES.
        01  FF-SUCCESSFUL          PIC  X(01) VALUE SPACES.
+       01  INTERNAL-KEY           PIC  X(08) VALUE LOW-VALUES.
 
        01  GET-COUNT              PIC  9(03) VALUE ZEROES.
 
@@ -167,6 +169,15 @@
            02  TD-TRANID          PIC  X(04).
            02  FILLER             PIC  X(01) VALUE SPACES.
            02  TD-MESSAGE         PIC  X(90) VALUE SPACES.
+
+       01  50702-MESSAGE.
+           02  FILLER             PIC  X(16) VALUE 'GET/READ primary'.
+           02  FILLER             PIC  X(16) VALUE ' key references '.
+           02  FILLER             PIC  X(16) VALUE 'an internal key '.
+           02  FILLER             PIC  X(16) VALUE 'on *FILE that do'.
+           02  FILLER             PIC  X(16) VALUE 'es not exist:   '.
+           02  FILLER             PIC  X(02) VALUE SPACES.
+           02  50702-KEY          PIC  X(08) VALUE 'xxxxxxxx'.
 
        01  FK-FCT.
            02  FK-TRANID          PIC  X(04) VALUE 'FA##'.
@@ -292,13 +303,36 @@
       *                                                               *
       * Read the FILE structure, which contains the zFAM data as      *
       * record segments.                                              *
+      *                                                               *
+      * An event control record (ECR) has no FILE structure record,   *
+      * so skip to the next key.                                      *
+      *                                                               *
+      * When a FILE segment read failed for this key and the internal *
+      * key has not changed, the segment does not exist, so end the   *
+      * request with a 507 instead of retrying the same read.         *
       *****************************************************************
        3100-READ-PROCESS.
            MOVE 'Y'                          TO PROCESS-COMPLETE.
            PERFORM 3200-READ-KEY           THRU 3200-EXIT.
-           PERFORM 3300-READ-FILE          THRU 3300-EXIT.
-           IF  FF-SUCCESSFUL EQUAL 'Y'
-               PERFORM 3400-STAGE          THRU 3400-EXIT.
+
+           IF  INTERNAL-KEY NOT EQUAL LOW-VALUES
+           AND FK-FF-KEY        EQUAL INTERNAL-KEY
+               MOVE FK-FF-KEY                TO 50702-KEY
+               MOVE 50702-MESSAGE            TO TD-MESSAGE
+               PERFORM 9900-WRITE-CSSL     THRU 9900-EXIT
+               MOVE DFHVALUE(IMMEDIATE)      TO SEND-ACTION
+               PERFORM 9810-STATUS-507     THRU 9810-EXIT
+               PERFORM 9000-RETURN         THRU 9000-EXIT.
+
+           IF  FK-ECR EQUAL 'Y'
+               PERFORM 3310-NEXT-KEY       THRU 3310-EXIT.
+
+           IF  FK-ECR NOT EQUAL 'Y'
+               PERFORM 3300-READ-FILE      THRU 3300-EXIT.
+
+           IF  FK-ECR NOT EQUAL 'Y'
+               IF  FF-SUCCESSFUL EQUAL 'Y'
+                   PERFORM 3400-STAGE      THRU 3400-EXIT.
        3100-EXIT.
            EXIT.
 
@@ -359,9 +393,7 @@
            END-EXEC.
 
            IF  EIBRESP EQUAL DFHRESP(NOTFND)
-               MOVE FK-KEY              TO GET-CA-KEY
-               PERFORM 2100-AUGMENT-KEY  THRU 2100-EXIT
-               MOVE 'N'                 TO PROCESS-COMPLETE
+               PERFORM 3310-NEXT-KEY     THRU 3310-EXIT
                MOVE 'N'                 TO FF-SUCCESSFUL
            ELSE
            IF  EIBRESP     EQUAL DFHRESP(NORMAL)
@@ -372,6 +404,41 @@
                PERFORM 9000-RETURN       THRU 9000-EXIT.
 
        3300-EXIT.
+           EXIT.
+
+      *****************************************************************
+      * The KEY structure record has no FILE structure record, so     *
+      * position past it to the next key.  The key length is set from *
+      * the key just read, not the requested key, so the augmented    *
+      * key is always greater than this key.  When no greater key can *
+      * be built, there are no more records.                          *
+      *****************************************************************
+       3310-NEXT-KEY.
+           MOVE FK-KEY                  TO GET-CA-KEY.
+           MOVE ZEROES                  TO NEXT-KEY-NULLS.
+
+           INSPECT FUNCTION REVERSE(FK-KEY)
+           TALLYING NEXT-KEY-NULLS
+           FOR LEADING LOW-VALUES.
+
+           SUBTRACT NEXT-KEY-NULLS FROM LENGTH OF FK-KEY
+               GIVING GET-CA-KEY-LENGTH.
+
+           PERFORM 2100-AUGMENT-KEY   THRU 2100-EXIT.
+
+           MOVE LOW-VALUES              TO INTERNAL-KEY.
+
+           IF  GET-CA-KEY NOT GREATER THAN FK-KEY
+               MOVE ZEROES              TO STATUS-LENGTH
+               MOVE ZEROES              TO MESSAGE-COUNT
+               PERFORM 9600-HEADER    THRU 9600-EXIT
+               MOVE FK-FCT              TO HTTP-204-FILE
+               PERFORM 9700-STATUS-204 THRU 9700-EXIT
+               PERFORM 9000-RETURN    THRU 9000-EXIT.
+
+           MOVE 'N'                     TO PROCESS-COMPLETE.
+
+       3310-EXIT.
            EXIT.
 
       *****************************************************************
@@ -440,6 +507,7 @@
            ELSE
                MOVE 'N'                          TO PROCESS-COMPLETE
                MOVE 'N'                          TO FF-SUCCESSFUL
+               MOVE FK-FF-KEY                    TO INTERNAL-KEY
                PERFORM 3510-FREEMAIN           THRU 3510-EXIT.
 
        3500-EXIT.
