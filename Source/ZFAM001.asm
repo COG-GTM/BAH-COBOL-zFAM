@@ -94,6 +94,10 @@ W_PREFIX DS    CL01               URI prefix
 *                                 in the URI prefix, set this byte to
 *                                 X'FF'.  This will be used to allow
 *                                 HTTP requests for both BM and QM
+*                                 Only set after the request has been
+*                                 verified to arrive on ZFAMREPL.
+*
+W_TCPIPS DS    CL08               TCPIPSERVICE name (EXTRACT TCPIP)
 *
 ***********************************************************************
 * WEB EXTRACT fields                                                  *
@@ -385,10 +389,37 @@ SY_0010  DS   0H
                QUERYSTRLEN(L_QUERY)                                    X
                NOHANDLE
 *
+         XC    C_USER,C_USER           Clear UserID   (STORAGECLEAR(NO))
+         XC    C_PASS,C_PASS           Clear Password
+         MVC   C_USERID,HEX_40         Clear logging UserID
+         MVI   W_PREFIX,X'00'          Clear replicate flag
+*
          CLC   W_PATH(10),REPLIC8      URI '/replicate' prefix?
-         BC    B'0111',*+8             ... no,  continue
+         BC    B'1000',SY_0012         ... yes, verify TCPIPSERVICE
+         CLC   W_PATH(10),DEPLIC8      URI '/deplicate' prefix?
+         BC    B'0111',SY_0014         ... no,  continue
+*
+***********************************************************************
+* Partner Data Center requests (/replicate and /deplicate) are only   *
+* accepted on the replication TCPIPSERVICE (ZFAMREPL).  The same      *
+* path on any other TCPIPSERVICE is rejected with STATUS(401).        *
+***********************************************************************
+SY_0012  DS   0H
+         EXEC CICS EXTRACT TCPIP                                       X
+               TCPIPSERVICE(W_TCPIPS)                                  X
+               NOHANDLE
+*
+         OC    EIBRESP,EIBRESP         Normal response?
+         BC    B'0111',ER_40115        ... no,  STATUS(401)
+*
+         CLC   W_TCPIPS,REPL_SVC       Replication TCPIPSERVICE?
+         BC    B'0111',ER_40115        ... no,  STATUS(401)
+*
+         CLC   W_PATH(10),REPLIC8      URI '/replicate' prefix?
+         BC    B'0111',SY_0014         ... no,  continue
          MVI   W_PREFIX,X'FF'          ... yes, set replicate flag
 *
+SY_0014  DS   0H
          CLC   L_QUERY,MAX_QS          Query string maximum exceeded?
          BC    B'0010',ER_41401        ... yes, set return code
 *
@@ -3169,6 +3200,13 @@ ER_40114 DS   0H
          MVC   C_REASON,=C'14'         Set REASON
          BC    B'1111',ER_XCTL         Transfer control to logging
 ***********************************************************************
+* STATUS(401) RETURN CODE(15)                                         *
+***********************************************************************
+ER_40115 DS   0H
+         MVC   C_STATUS,S_401          Set STATUS
+         MVC   C_REASON,=C'15'         Set REASON
+         BC    B'1111',ER_XCTL         Transfer control to logging
+***********************************************************************
 * STATUS(405) RETURN CODE(01)                                         *
 ***********************************************************************
 ER_40501 DS   0H
@@ -3312,6 +3350,8 @@ ER_50002 DS   0H
 DECODE   DC    V(ZDECODE)              ZDECODE subroutine
          DS   0F
 REPLIC8  DC    CL10'/replicate'        zFAM replication
+DEPLIC8  DC    CL10'/deplicate'        zFAM deplication
+REPL_SVC DC    CL08'ZFAMREPL'          Replication TCPIPSERVICE
 URI_DS   DC    CL10'/datastore'        datastore URI
          DS   0H
 FA_PRE   DC    CL02'FA'                zFAM transaction prefix

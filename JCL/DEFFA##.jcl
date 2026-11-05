@@ -16,6 +16,7 @@
  @org@           devops
  @pri_cyl@       2000
  @reg@           ALL
+ @repl_port@     @rep_port@
  @scheme@        http
  @sec_cyl@       1000
 /*
