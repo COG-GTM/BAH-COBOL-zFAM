@@ -91,10 +91,13 @@ W_SIGN   DS    CL01               Where sign
 *
 W_PREFIX DS    CL01               URI prefix
 *                                 When a replicate request is sent
-*                                 in the URI prefix, set this byte to
+*                                 in the URI prefix and is received
+*                                 on the zFAM replication
+*                                 TCPIPSERVICE, set this byte to
 *                                 X'FF'.  This will be used to allow
 *                                 HTTP requests for both BM and QM
 *
+W_TCPIPS DS    CL08               TCPIPSERVICE name
 ***********************************************************************
 * WEB EXTRACT fields                                                  *
 ***********************************************************************
@@ -385,9 +388,8 @@ SY_0010  DS   0H
                QUERYSTRLEN(L_QUERY)                                    X
                NOHANDLE
 *
-         CLC   W_PATH(10),REPLIC8      URI '/replicate' prefix?
-         BC    B'0111',*+8             ... no,  continue
-         MVI   W_PREFIX,X'FF'          ... yes, set replicate flag
+         MVI   W_PREFIX,X'00'          Reset replicate flag
+         XC    C_USER,C_USER           Reset UserID
 *
          CLC   L_QUERY,MAX_QS          Query string maximum exceeded?
          BC    B'0010',ER_41401        ... yes, set return code
@@ -395,6 +397,30 @@ SY_0010  DS   0H
          CLC   EIBRESP2,=F'30'         Path length exceeded?
          BC    B'1000',ER_41402        ... yes, set return code
 *
+         CLC   W_PATH(10),REPLIC8      URI '/replicate' prefix?
+         BC    B'1000',SY_0012         ... yes, validate TCPIPSERVICE
+         CLC   W_PATH(10),DEPLIC8      URI '/deplicate' prefix?
+         BC    B'0111',SY_0015         ... no,  continue
+*
+***********************************************************************
+* Replicate and deplicate requests bypass Basic Authentication, so    *
+* they are only honored when received on the zFAM replication         *
+* TCPIPSERVICE (ZFAMREPL).  Reject them on any other TCPIPSERVICE.    *
+***********************************************************************
+SY_0012  DS   0H
+         EXEC CICS EXTRACT TCPIP                                       X
+               TCPIPSERVICE(W_TCPIPS)                                  X
+               NOHANDLE
+         OC    EIBRESP,EIBRESP         Normal response?
+         BC    B'0111',ER_40115        ... no,  STATUS(401)
+         CLC   W_TCPIPS,REPL_SRV       Replication TCPIPSERVICE?
+         BC    B'0111',ER_40115        ... no,  STATUS(401)
+*
+         CLC   W_PATH(10),REPLIC8      URI '/replicate' prefix?
+         BC    B'0111',SY_0015         ... no,  continue
+         MVI   W_PREFIX,X'FF'          ... yes, set replicate flag
+*
+SY_0015  DS   0H
          CLC   W_SCHEME,DFHVALUE(HTTP) HTTP (non-SSL) request?
          BC    B'1000',SY_0050         ... yes, skip READ HTTPHEADER
 *
@@ -3169,6 +3195,13 @@ ER_40114 DS   0H
          MVC   C_REASON,=C'14'         Set REASON
          BC    B'1111',ER_XCTL         Transfer control to logging
 ***********************************************************************
+* STATUS(401) RETURN CODE(15)                                         *
+***********************************************************************
+ER_40115 DS   0H
+         MVC   C_STATUS,S_401          Set STATUS
+         MVC   C_REASON,=C'15'         Set REASON
+         BC    B'1111',ER_XCTL         Transfer control to logging
+***********************************************************************
 * STATUS(405) RETURN CODE(01)                                         *
 ***********************************************************************
 ER_40501 DS   0H
@@ -3312,6 +3345,8 @@ ER_50002 DS   0H
 DECODE   DC    V(ZDECODE)              ZDECODE subroutine
          DS   0F
 REPLIC8  DC    CL10'/replicate'        zFAM replication
+DEPLIC8  DC    CL10'/deplicate'        zFAM deplication
+REPL_SRV DC    CL08'ZFAMREPL'          zFAM replication TCPIPSERVICE
 URI_DS   DC    CL10'/datastore'        datastore URI
          DS   0H
 FA_PRE   DC    CL02'FA'                zFAM transaction prefix

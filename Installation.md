@@ -282,6 +282,8 @@ number.
 To define the replication port, submit CSDZFAMR in the JCL library to define the ZFAMREPL TCPIPService definition. After
 the job has completed, install the ZFAMREPL definition. This should be done in both the primary and alternate environments.
 
+Replication requests (`/replicate` and `/deplicate`) are sent by the partner environment without Basic Authentication credentials. ZFAM001 only honors these requests when they arrive on the ZFAMREPL TCPIPService and rejects them with STATUS(401) on any other port. The `/replicate` and `/deplicate` URIMAPs are also restricted to @rep_port@. Because any client that can reach the replication port is trusted, restrict network access to @rep_port@ (for example with a firewall) to the partner environment only.
+
 To enable replication for an instance of ZFAM, edit FA##DC in the JCL library and modify the SYSUT1 DD. The valid values
 for type are AA, AS and A1. AA is for active-active replication. AS is for active-standby and A1 is stand alone. The
 second line is the host name and port of the opposing environment. The primary environment will need to have the
