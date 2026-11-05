@@ -42,6 +42,8 @@
 - 400 09-002 zFAM task abended during I/O processing
 - 400 10-001 Invalid query string on POST/PUT request DFHCOMMAREA parser.
 - 400 10-002 zFAM-RangeBegin or zFAM-RangeEnd specified for DELETE request.
+- 400 01-022 WHERE value exceeds FAxxFD defined field length
+- 400 02-022 WHERE value is missing (zero length)
 - 400 11-002 zFAM-RangeBegin is less than zFAM-RangeEnd for DELETE request.
 - 401 01-001 Basic Authentication credentials not present in HTTPS request
 - 401 02-001 Basic Authentication credentials invalid in HTTPS request

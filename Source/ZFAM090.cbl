@@ -1079,6 +1079,26 @@
                05  FILLER         PIC  X(16) VALUE 'econdary Column '.
                05  FILLER         PIC  X(16) VALUE 'Index request   '.
 
+               05  FILLER         PIC  9(03) VALUE 400.
+               05  FILLER         PIC  9(02) VALUE  01.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '022'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'WHERE value exce'.
+               05  FILLER         PIC  X(16) VALUE 'eds FAxxFD defin'.
+               05  FILLER         PIC  X(16) VALUE 'ed field length '.
+               05  FILLER         PIC  X(16) VALUE '                '.
+
+               05  FILLER         PIC  9(03) VALUE 400.
+               05  FILLER         PIC  9(02) VALUE  02.
+               05  FILLER         PIC  X(01) VALUE '-'.
+               05  FILLER         PIC  X(03) VALUE '022'.
+               05  FILLER         PIC  X(01) VALUE SPACE.
+               05  FILLER         PIC  X(16) VALUE 'WHERE value is m'.
+               05  FILLER         PIC  X(16) VALUE 'issing (zero len'.
+               05  FILLER         PIC  X(16) VALUE 'gth)            '.
+               05  FILLER         PIC  X(16) VALUE '                '.
+
                05  FILLER         PIC  9(03) VALUE 412.
                05  FILLER         PIC  9(02) VALUE  01.
                05  FILLER         PIC  X(01) VALUE '-'.
@@ -1541,7 +1561,7 @@
                05  FILLER         PIC  X(16) VALUE '                '.
                05  FILLER         PIC  X(16) VALUE '                '.
 
-           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 140 TIMES.
+           02  STATUS-TABLE REDEFINES STATUS-ARRAY OCCURS 149 TIMES.
                05  STATUS-CODE    PIC  9(03).
                05  STATUS-MESSAGE.
                 10 REASON-CODE    PIC  9(02).

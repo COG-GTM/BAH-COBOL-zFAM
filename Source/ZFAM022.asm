@@ -526,6 +526,10 @@ SY_0040  DS   0H
          ST    R9,FD_ADDR              Save field data address
          MVC   FD_LEN,C_LENGTH         Move field data length
 *
+         L     R1,FD_LEN               Load field data length
+         LTR   R1,R1                   WHERE data present?
+         BC    B'1100',ER_40002        ... no,  reject request
+*
          L     R7,CA_PTR               Load CI Array pointer
          USING CA_DSECT,R7             ... tell assembler
 *
@@ -549,9 +553,25 @@ SY_0041  DS   0H
          BCT   R1,SY_0041              Continue parsing
          MVI   CA_WC,C' '              Set Wildcard to 'no'
 ***********************************************************************
-* Select Secondary Column Index field type and branch accordingly.    *
+* WHERE data must not exceed the field length (plus one byte for a    *
+* wildcard '*') or the CI data maximum.  CA_DATA is justified using   *
+* the field length, so longer data would be moved outside of the      *
+* CI Array entry.                                                     *
 ***********************************************************************
 SY_0042  DS   0H
+         ZAP   W_PDWA,CA_F_LEN         Move field length
+         CVB   R1,W_PDWA               Convert to binary
+         CLI   CA_WC,C'*'              Wildcard present?
+         BC    B'0111',*+8             ... no,  use field length
+         LA    R1,1(,R1)               ... yes, allow for '*'
+         C     R1,MAX_CI               CI data maximum exceeded?
+         BC    B'1100',*+8             ... no,  use computed length
+         L     R1,MAX_CI               ... yes, use CI data maximum
+         C     R1,FD_LEN               WHERE data exceeds maximum?
+         BC    B'0100',ER_40001        ... yes, reject request
+***********************************************************************
+* Select Secondary Column Index field type and branch accordingly.    *
+***********************************************************************
          CLI   CA_WC,C'*'              Wildcard present?
          BC    B'1000',SY_0043         ... yes, treat as character
          CLI   CA_TYPE,C'C'            Character field type?
@@ -2156,6 +2176,20 @@ ER_20408 DS   0H
          MVC   C_STATUS,S_204          Set STATUS
          MVC   C_REASON,=C'08'         Set REASON
          MVC   C_FILE,EIBDS            Set FCT name
+         BC    B'1111',PC_0010         Transfer control to logging
+***********************************************************************
+* STATUS(400)                                                         *
+***********************************************************************
+ER_40001 DS   0H
+         MVC   C_STATUS,S_400          Set STATUS
+         MVC   C_REASON,=C'01'         Set REASON
+         BC    B'1111',PC_0010         Transfer control to logging
+***********************************************************************
+* STATUS(400)                                                         *
+***********************************************************************
+ER_40002 DS   0H
+         MVC   C_STATUS,S_400          Set STATUS
+         MVC   C_REASON,=C'02'         Set REASON
          BC    B'1111',PC_0010         Transfer control to logging
 ***********************************************************************
 * STATUS(412)                                                         *
