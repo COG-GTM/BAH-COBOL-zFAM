@@ -6,6 +6,8 @@
 //* Change ## to the @id@ value in DEFFA##, example: C ## 01 ALL
 //* Customize replication parameters
 //* Note: the scheme used below must match @scheme@ in DEFFA##
+//* Note: the port must be the ZFAMREPL replication port (@rep_port@).
+//*       /replicate and /deplicate are rejected on any other port.
 //* Submit
 //* Enter CANCEL on the command line to cancel changes and exit edit
 //**********************************************************************

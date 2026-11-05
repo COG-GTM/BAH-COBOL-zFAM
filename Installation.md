@@ -198,6 +198,8 @@ customize the following fields.
     1. **@org@** is the organization identifier used in the path of the service.
     1. **@pri_cyl@** is the primary number of cylinders for ZFAM files.
     1. **@reg@** is the region or boundary of the implementation.
+    1. **@repl_port@** is set to the @rep_port@ value by the CONFIG job; leave it unchanged. It restricts the
+    `/replicate` and `/deplicate` URIMAPs to the replication port.
     1. **@scheme@** is the setting for the SCHEME parameter on the URIMAP definition. Use either http or https.
     1. **@sec_cyl@** is the secondary number of cylinders for ZFAM files.
     *Note: the path is created by the @cc@, @reg@, @org@ and @appname@ values; /datastore/zFAM/@cc@/@reg@/@org@/@app_name@.*
@@ -227,6 +229,8 @@ customize the following fields.
     1. **@org@** is the organization identifier used in the path of the service.
     1. **@pri_cyl@** is the primary number of cylinders for ZFAM files.
     1. **@reg@** is the region or boundary of the implementation.
+    1. **@repl_port@** is set to the @rep_port@ value by the CONFIG job; leave it unchanged. It restricts the
+    `/replicate` and `/deplicate` URIMAPs to the replication port.
     1. **@scheme@** is the setting for the SCHEME parameter on the URIMAP definition. Use either http or https.
     1. **@sec_cyl@** is the secondary number of cylinders for ZFAM files.
     *Note: the path is created by the @cc@, @reg@, @org@ and @appname@ values; /datastore/zFAM/@cc@/@reg@/@org@/@app_name@.*
@@ -281,6 +285,13 @@ number.
 
 To define the replication port, submit CSDZFAMR in the JCL library to define the ZFAMREPL TCPIPService definition. After
 the job has completed, install the ZFAMREPL definition. This should be done in both the primary and alternate environments.
+
+Partner data center requests (`/replicate` and `/deplicate`) are only accepted on the ZFAMREPL TCPIPService. The
+`/replicate` and `/deplicate` URIMAPs of each instance are defined with `PORT(@rep_port@)`, and ZFAM001 confirms the
+request arrived on the TCPIPService named ZFAMREPL (`EXEC CICS EXTRACT TCPIP TCPIPSERVICE`) before it skips Basic
+Authentication and the FAxxSD security document. The same paths on the http or https data ports return STATUS(401)
+with reason 15. Do not rename the ZFAMREPL TCPIPService, and restrict network access to @rep_port@ (for example with a
+firewall rule) so only the partner sysplex can reach it.
 
 To enable replication for an instance of ZFAM, edit FA##DC in the JCL library and modify the SYSUT1 DD. The valid values
 for type are AA, AS and A1. AA is for active-active replication. AS is for active-standby and A1 is stand alone. The
