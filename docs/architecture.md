@@ -23,7 +23,7 @@ zFAM is a key/value store that runs as a set of CICS/TS programs on z/OS. Client
    | `/zComplete/zFAM/...`, `/zRecovery/zFAM/...` | `FZ##` | `ZFAM100` | Defined in the CSD; no `ZFAM100` source is in this repo |
 
 3. **`ZFAM001` (HLASM), control program.** Performs Basic Authentication, reads the instance's document templates (`FA##SD` security, `FA##FD` field definitions), and applies row and field level security. Plain HTTP is only allowed for GET when the read-only option is enabled. If the query string (GET/DELETE) or body (POST/PUT) holds zQL, the request is **Query Mode**; otherwise it is **Basic Mode**. It then `XCTL`s to the service program, passing the parsed request in a channel.
-4. **Service programs** do the VSAM I/O and send the HTTP response. Errors from any program are `LINK`ed to **`ZFAM090`**, which writes the error log and returns the HTTP status (see [http_response_codes.md](../http_response_codes.md)).
+4. **Service programs** do the VSAM I/O and send the HTTP response. On an error, the program `XCTL`s to **`ZFAM090`** (it does not return), which writes the error log and sends the HTTP status (see [http_response_codes.md](../http_response_codes.md)).
 
 ### Basic Mode (key/value)
 
