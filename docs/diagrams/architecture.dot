@@ -33,7 +33,8 @@ digraph zFAM {
 
     subgraph cluster_bg {
       label="Background tasks"; style="rounded,dashed"; color="#aa6633";
-      plt [label="ZFAMPLT (PLTPI / FPLT)\nZFAMNC (ZFNC,FAxx)", fillcolor="#ffe6cc"];
+      plt [label="ZFAMPLT (PLTPI / FPLT)\nstarts expiry in all regions", fillcolor="#ffe6cc"];
+      zfnc [label="ZFAMNC (ZFNC,FAxx)\nper-instance setup", fillcolor="#ffe6cc"];
       z000 [label="ZFAM000 (FXxx)\nTTL expiration, restarts via START", fillcolor="#ffe6cc"];
       z101 [label="ZFAM101\ncopy-while-replicating", fillcolor="#ffe6cc"];
     }
@@ -69,8 +70,9 @@ digraph zFAM {
   z000 -> partner [label="/deplicate"];
   z000 -> keyds; z000 -> expire;
   plt -> z000 [label="START FXxx"];
-  plt -> nc [label="DEFINE"];
-  z001 -> z090 [style=dotted, label="errors"];
+  zfnc -> nc [label="DEFINE DCOUNTER"];
+  zfnc -> z000 [label="START FXxx\n(this region)"];
+  z001 -> z090 [style=dotted, label="XCTL on error"];
   z002 -> helpers [style=dotted];
 
 }
