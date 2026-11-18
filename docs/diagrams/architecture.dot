@@ -1,0 +1,78 @@
+// zFAM architecture, drawn from Source/ and JCL/ on master.
+// Render: ./render.sh  (needs graphviz)
+digraph zFAM {
+  graph [rankdir=TB, fontname="DejaVu Sans", fontsize=18, nodesep=0.35, ranksep=0.55,
+         label="zFAM (z/OS File Access Manager) - runtime architecture", labelloc=t, pad=0.3];
+  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=15, fillcolor=white];
+  edge  [fontname="DejaVu Sans", fontsize=12, color="#444444"];
+
+  client [label="HTTP/HTTPS client\nGET / POST / PUT / DELETE\n/datastore/zFAM/cc/reg/org/app/<key>", shape=box, fillcolor="#fff2cc"];
+  partner [label="Partner data center zFAM\n(other sysplex, same FAxx)\n/replicate  /deplicate", fillcolor="#fff2cc"];
+
+  subgraph cluster_cics {
+    label="CICS/TS region (one of a cluster behind Sysplex Distributor + shared port)"; style="rounded"; color="#3366aa"; fontsize=16;
+
+    tcpip [label="TCPIPSERVICE ZFAMNSSL / ZFAMSSL / ZFAMREPL\nURIMAP FAxx -> transaction FAxx", fillcolor="#dae8fc"];
+    z001 [label="ZFAM001 (HLASM) - control program\nBasic Auth, FAxxSD row/field security,\nmode select, zQL parser", fillcolor="#d5e8d4"];
+
+    subgraph cluster_basic {
+      label="Basic Mode (key/value)"; style="rounded,dashed"; color="#558855";
+      z002 [label="ZFAM002 - Basic Mode CRUD\nTTL, LOB segments, row locks,\nzFAM-UID, replication", fillcolor="#d5e8d4"];
+      browse [label="ZFAM003 range DELETE\nZFAM004/005 GE,GT / LE,LT browse\nZFAM007/008/009 rows= / keysonly", fillcolor="#d5e8d4"];
+      ci_basic [label="ZFAM011 / 031 / 041\ncolumn-index upkeep\n(when FAxxFD has CIs)", fillcolor="#d5e8d4"];
+    }
+
+    subgraph cluster_query {
+      label="Query Mode (zQL)"; style="rounded,dashed"; color="#558855";
+      qm [label="ZFAM010 INSERT (POST)\nZFAM020 / 022 SELECT (GET)\nZFAM030 UPDATE (PUT)\nZFAM040 DELETE", fillcolor="#d5e8d4"];
+      z102 [label="ZFAM102\nquery-mode replication", fillcolor="#d5e8d4"];
+    }
+
+    z090 [label="ZFAM090\nerror log + HTTP status", fillcolor="#f8cecc"];
+    helpers [label="Helpers: ZFAM006 (key +1), L8WAIT,\nZUIDSTCK (TOD), ZUID001 (ZUID repo)", fillcolor="#eeeeee"];
+
+    subgraph cluster_bg {
+      label="Background tasks"; style="rounded,dashed"; color="#aa6633";
+      plt [label="ZFAMPLT (PLTPI / FPLT)\nstarts expiry in all regions", fillcolor="#ffe6cc"];
+      zfnc [label="ZFAMNC (ZFNC,FAxx)\nper-instance setup", fillcolor="#ffe6cc"];
+      z000 [label="ZFAM000 (FXxx)\nTTL expiration, restarts via START", fillcolor="#ffe6cc"];
+      z101 [label="ZFAM101\ncopy-while-replicating", fillcolor="#ffe6cc"];
+    }
+  }
+
+  subgraph cluster_data {
+    label="VSAM RLS data sets (per instance FAxx) and document templates"; style="rounded"; color="#666666"; fontsize=16;
+    keyds [label="FAxxKEY\nkey store (KEYS 255)", shape=cylinder, fillcolor="#e1d5e7"];
+    fileds [label="FAxxFILE\ndata store, 32,000-byte segments", shape=cylinder, fillcolor="#e1d5e7"];
+    cids [label="FAxxCInn\nsecondary column indexes", shape=cylinder, fillcolor="#e1d5e7"];
+    expire [label="FAEXPIRE\nexpiry control (per env)", shape=cylinder, fillcolor="#e1d5e7"];
+    doct [label="DOCTEMPLATEs\nFAxxSD security  FAxxFD fields\nFAxxDC replication target", shape=note, fillcolor="#e1d5e7"];
+    {rank=same; keyds; fileds; cids;}
+    {rank=same; expire; doct; nc;}
+    keyds -> expire [style=invis]; fileds -> doct [style=invis]; cids -> nc [style=invis];
+    nc [label="CF named counter\n(internal file key)", shape=cylinder, fillcolor="#e1d5e7"];
+  }
+
+  client -> tcpip -> z001;
+  z001 -> doct [label="read", style=dashed];
+  z001 -> z002 [label="XCTL\nno zQL"];
+  z001 -> qm [label="XCTL\nzQL"];
+  z002 -> browse [label="XCTL"];
+  z002 -> ci_basic [label="LINK"];
+  qm -> z102 [label="LINK"];
+  z002 -> keyds; z002 -> fileds; z002 -> nc [style=dashed];
+  qm -> keyds; qm -> fileds; qm -> cids;
+  ci_basic -> cids;
+  browse -> keyds;
+  z002 -> partner [label="WEB CONVERSE\n/replicate"];
+  z102 -> partner;
+  z101 -> partner;
+  z000 -> partner [label="/deplicate"];
+  z000 -> keyds; z000 -> expire;
+  plt -> z000 [label="START FXxx"];
+  zfnc -> nc [label="DEFINE DCOUNTER"];
+  zfnc -> z000 [label="START FXxx\n(this region)"];
+  z001 -> z090 [style=dotted, label="XCTL on error"];
+  z002 -> helpers [style=dotted];
+
+}

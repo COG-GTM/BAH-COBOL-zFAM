@@ -130,7 +130,8 @@ the supplied job or use your own job.
     commands. The DFHEITAL and DFHYITVL procs must be customized and available in the library specified earlier in the
     @proc_lib@ configuration item. Submit the ASMZFAM job. It should end with return code 4 or less.
     1. Using your own assembly/compile and link jobs. If you wish to use your own assembly/compile jobs, here is a list
-    of programs and their languages. Copybooks ZFAMFFC, ZFAMFKC and ZFAMHEX will need to be available for Cobol compiles.
+    of programs and their languages. Copybooks ZFAMCIC, ZFAMFFC, ZFAMFKC and ZFAMHEX will need to be available for Cobol compiles, and macros ZFAMCIA, ZFAMDFA, ZFAMDKA and ZFAMFKA for Assembler.
+        1. L8WAIT   *Assembler*
         1. ZFAMNC   *Assembler*
         1. ZFAMPLT  *Cobol*
         1. ZFAM000  *Cobol*
@@ -180,7 +181,7 @@ to be picked up as entry in the PLTPI in the next few steps.
 1. Define program ZFAMPLT as an entry to the PLTPI table in the regions destined to run the ZFAM services. Refer to
 instructions for PLT-program list table in IBM Knowledge Center for CICS.
 
-1. Invoke the ZFAMPLT program. This can be done by restarting the CICS region or by running the ZPLT transaction in each
+1. Invoke the ZFAMPLT program. This can be done by restarting the CICS region or by running the FPLT transaction in each
 of the CICS regions.
 
 #### Define a ZFAM basic mode instance
